@@ -1,7 +1,10 @@
 #include <cmath>
-#include <vector>
+//#include <vector>
+#include "LinearAlgebra.h"
 
 #define DLL_EXPORT __declspec(dllexport)
+
+using namespace std;
 
 struct ColliderData {
 	float* colliderPositions;
@@ -27,7 +30,7 @@ extern "C" {
 	int currentCollidingVertexCount = 0;
 	int* collidingVertices;
 
-
+#pragma region collider specific collision handling
 	//Checks collision between a point and a box (3D)
 	bool pointBoxCollision(float* point, float* colliderPosition, float* colliderSize) {
 		for (int i = 0; i < 3; i++) {
@@ -37,38 +40,108 @@ extern "C" {
 		return true;
 	}
 
+	float* boxCollisionProjection(float*point, float*prevPoint, float*colliderPos, float*colliderSize) {
+		float* result = new float[3];
+		float* min = new float[3];
+		float* max = new float[3];
+		float* planePoint = new float[3];
+
+		//determine min and max point of AABB
+		for (int i = 0; i < 3; i++) {
+			min[i] = colliderPos[i] - (colliderSize[i] / 2);
+			max[i] = colliderPos[i] + (colliderSize[i] / 2);
+		}
+		 
+		//determine sector of previous point in relation to collider
+		int* prevPointSector = new int[3]{ 0, 0, 0 };
+		for (int i = 0; i < 3; i++) {
+			if (prevPoint[i] < min[i]) {
+				prevPointSector[i] = -1;
+				planePoint[i] = min[i];
+			}else if (prevPoint[i] < max[i]) {
+				prevPointSector[i] = 1;
+				planePoint[i] = max[i];
+			}
+		}
+
+		//determine planes for 
+
+
+		return result;
+	}
+
+#pragma endregion collider specific collision handling methods
+	
+#pragma region general collision handling
+	bool collisionCheck(float* point, float* colliderPos, float* colliderSize, int colliderType) {
+		switch (colliderType) {
+		case -1: 
+			return false;
+			break;
+		case 1: //box
+			return pointBoxCollision(point, colliderPos, colliderSize);
+			break;
+		}
+	}
+
+	float* collisionProjection(float* point, float* prevPoint, float* colliderPos, float* colliderSize, int colliderType) {
+		switch (colliderType) {
+		case 1:	//box
+			return boxCollisionProjection(point, prevPoint, colliderPos, colliderSize);
+			break;
+		}
+	}
+
 	// TODO: differentiate the type of collision check depending on the type
 	// Returns the count of vertices inside colliders
 	void getCollidingVertices() {
 		int collCount = 0;
 		float* vertex = new float[3];
+		float* prevVertex = new float[3];
 		float* collPos = new float[3];
 		float* collSize = new float[3];
+		int collType = -1;
 		float* collidingVertices = new float[vertexCount * 3];
+
+		//go over all vertices
 		for (int i = 0; i < vertexCount; i++) {
 			// get current vertex
 			vertex[0] = vertexArray[i * 3];
 			vertex[1] = vertexArray[i * 3 + 1];
 			vertex[2] = vertexArray[i * 3 + 2];
+			// get corresponding previous vertex
+			prevVertex[0] = previousVertexArray[i * 3];
+			prevVertex[1] = previousVertexArray[i * 3 + 1];
+			prevVertex[2] = previousVertexArray[i * 3 + 2];
+
+			//go over all colliders
 			for (int j = 0; j < collData.colliderCount; j++) {
-				//set type
 				// get current collider data
+				collType = collData.colliderTypes[j];
 				for (int g = 0; g < 3; g++) {
 					collPos[g] = collData.colliderPositions[j * 3 + g];
 					collSize[g] = collData.colliderSizes[j * 3 + g];
 				}
 				//collision check
-			// TODO: switch collData.collTypes[j]
-				if (pointBoxCollision(vertex, collPos, collSize)) {
+				if (collisionCheck(vertex, collPos, collSize, collType)) {
 					collCount++;
+					vertex = collisionProjection(vertex, previousVertexArray, collPos, collSize, collType);
+					//set new vertex data
+					vertexArray[i * 3] = vertex[0];
+					vertexArray[i * 3 + 1] = vertex[1];
+					vertexArray[i * 3 + 2] = vertex[2];
 				}
 			}
 		}
 		currentCollidingVertexCount = collCount;
 	}
 
+#pragma endregion general collision handling
+
+	/*
 	//transforms the vertices/colliders according to the tet mesh transformation
-	/*void tansformTetMesh() {
+	
+	void tansformTetMesh() {
 
 		float rotationMatrix[3][3];
 
@@ -108,7 +181,9 @@ extern "C" {
 		}
 	}*/
 
-	/// SETTERS
+#pragma region Exports
+
+#pragma region Setters
 	DLL_EXPORT void dll_setVertices(float* vertices, int vertCount) {
 		vertexCount = vertCount;
 		vertexArray = new float[vertCount*3];
@@ -138,24 +213,29 @@ extern "C" {
 			collData.colliderTypes[i] = colliderTypes[i];
 		}
 	}
+#pragma endregion Setters
 
-	/// GETTERS
+#pragma region Getters
 	DLL_EXPORT void dll_getVertices(int* outputArray) {
-		std::memcpy(outputArray, vertexArray, vertexCount * 3 * sizeof(float));
+		memcpy(outputArray, vertexArray, vertexCount * 3 * sizeof(float));
 	}
 
 	DLL_EXPORT void dll_getColliders(int* positionOutput, int* sizeOutput, int* typeOutput) {
-		std::memcpy(positionOutput, collData.colliderPositions, collData.colliderCount * 3 * sizeof(float));
-		std::memcpy(sizeOutput, collData.colliderSizes, collData.colliderCount * 3 * sizeof(float));
-		std::memcpy(typeOutput, collData.colliderTypes, collData.colliderCount * sizeof(int));
+		memcpy(positionOutput, collData.colliderPositions, collData.colliderCount * 3 * sizeof(float));
+		memcpy(sizeOutput, collData.colliderSizes, collData.colliderCount * 3 * sizeof(float));
+		memcpy(typeOutput, collData.colliderTypes, collData.colliderCount * sizeof(int));
 	}
 	
 	DLL_EXPORT int dll_getCollisionCount() {
 		return currentCollidingVertexCount;
 	}
+#pragma endregion Getters
 
-	///Calculations
+#pragma region Calculations
 	DLL_EXPORT void dll_collisionRepsonses() {
 		getCollidingVertices();
 	}
+#pragma endregion Calculations
+
+#pragma endregion Exports
 }
