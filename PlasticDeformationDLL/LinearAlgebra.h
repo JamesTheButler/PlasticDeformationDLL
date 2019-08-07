@@ -9,6 +9,6 @@ public:
 	LinearAlgebra();
 	~LinearAlgebra();
 
-	static Vector3f linePlaneIntersection(Vector3f planePoint, Vector3f planeNormal, Vector3f lineOrigin, Vector3f lineDirection);
+	static float tAtLinePlaneIntersection(Vector3f planePoint, Vector3f planeNormal, Vector3f lineOrigin, Vector3f lineDirection);
 };
 
