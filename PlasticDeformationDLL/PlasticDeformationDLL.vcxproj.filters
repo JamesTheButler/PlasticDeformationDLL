@@ -18,5 +18,13 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
+    <ClCompile Include="LinearAlgebra.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="LinearAlgebra.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
