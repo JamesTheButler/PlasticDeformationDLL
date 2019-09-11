@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstring>
+#include <vector>
 #include <gmtl/Intersection.h>
 #include <gmtl/Quat.h>
 
@@ -13,6 +14,19 @@ struct ColliderData {
 	Vec3f* colliderSizes;
 	int* colliderTypes;
 	int colliderCount;
+};
+
+struct ConstraintData {
+	//array of vertex indeces
+	int* vertexIds;
+	// starting index of the vertexID array
+	int* vertexStartIndeces;
+	// number of vertex indeces for each constraint
+	int* vertexIdArrayLengths;
+	float* currentValues;
+	float* restValues;
+	int* constraintTypes;
+	int constraintCount;
 };
 
 //Solver data
@@ -31,6 +45,7 @@ int _vertexCount;
 ColliderData _collData;
 
 //constraint data
+ConstraintData _constraintData;
 
 // collision data
 int _currentCollidingVertexCount = 0;
@@ -58,20 +73,6 @@ AABoxf makeAABox(Point3f position, Vec3f size) {
 	return AABoxf(min, max);
 }
 
-void solve() {
-	// get previous verts
-
-	// generate collision constraints
-
-	for (int i = 0; i < _iterationCount; i++) {
-		//for each constraint
-		//	constraint.solve();
-
-	}
-	// write velocity update 
-
-
-}
 
 #pragma region collisions
 bool doesCollide(Point3f vertex, Point3f colliderPos, Vec3f colliderSize, int colliderType) {
@@ -129,6 +130,20 @@ void collisionHandling() {
 }
 #pragma endregion collisions
 
+void solve() {
+	// get previous verts
+
+	//handle collisions
+	collisionHandling();
+
+	for (int i = 0; i < _iterationCount; i++) {
+		//for each constraint
+		//	constraint.solve();
+
+	}
+	// write velocity update 
+}
+
 #pragma region Setters
 void setVertices(float* vertices, int vertCount) {
 	_vertexCount = vertCount;
@@ -156,6 +171,30 @@ void setColliders(float* colliderPositions, float* colliderSizes, int* colliderT
 		}
 	}
 }
+
+void setConstraints(int* vertexIds, int* vertexStartIndeces, int* vertexIdArrayLengths, float* currentValues, float* restValues, int* constraintTypes, int constraintCount) {
+	_constraintData.constraintCount = constraintCount;
+	_constraintData.vertexStartIndeces = new int[constraintCount];
+	_constraintData.vertexIdArrayLengths = new int[constraintCount];
+	_constraintData.currentValues = new float[constraintCount];
+	int vertexIdCount = vertexStartIndeces[constraintCount - 1] + vertexIdArrayLengths[constraintCount - 1];
+	_constraintData.vertexIds = new int[vertexIdCount-1];
+	_constraintData.restValues = new float[constraintCount];
+	_constraintData.constraintTypes = new int[constraintCount];
+	
+	for (int i = 0; i < constraintCount; i++) {
+		_constraintData.vertexIds[i] = vertexIds[i];
+		_constraintData.vertexStartIndeces[i] = vertexStartIndeces[i];
+		_constraintData.vertexIdArrayLengths[i] = vertexIdArrayLengths[i];
+		_constraintData.currentValues[i] = currentValues[i];
+		_constraintData.restValues[i] = restValues[i];
+		_constraintData.constraintTypes[i] = constraintTypes[i];
+	}
+	for (int i = constraintCount; i < vertexIdCount; i++) {
+		_constraintData.vertexIds[i] = vertexIds[i];
+	}
+}
+
 
 void applyTetMeshTransformation(float* translation, float* rotation) {
 	Point3f trans;
@@ -211,7 +250,8 @@ extern "C" {
 		setVertices(vertices, vertCount);
 	}
 
-	DLL_EXPORT void dll_setConstraints() {
+	DLL_EXPORT void dll_setConstraints(int* vertexIds, int* vertexStartIndeces, int* vertexIndexArrayLength, float* currentValues, float* restValues, int* colliderTypes, int constraintCount) {
+		setConstraints(vertexIds, vertexStartIndeces, vertexIndexArrayLength, currentValues, restValues, colliderTypes, constraintCount);
 	}
 
 	DLL_EXPORT void dll_setColliders(float* colliderPositions, float* colliderSizes, int* colliderTypes, int colliderCount) {
@@ -238,6 +278,10 @@ extern "C" {
 		memcpy(positionOutput, _collData.colliderPositions->mData, _collData.colliderCount * 3 * sizeof(float));
 		memcpy(sizeOutput, _collData.colliderSizes->mData, _collData.colliderCount * 3 * sizeof(float));
 		memcpy(typeOutput, _collData.colliderTypes, _collData.colliderCount * sizeof(int));
+	}
+
+	DLL_EXPORT void dll_getConstraintTypes(int* outputArray) {
+		memcpy(outputArray, _constraintData.constraintTypes, _constraintData.constraintCount * sizeof(int));
 	}
 
 	DLL_EXPORT int dll_getCollisionCount() {
