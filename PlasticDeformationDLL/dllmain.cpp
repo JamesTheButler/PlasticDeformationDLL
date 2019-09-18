@@ -1,17 +1,29 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
-#include <gmtl/Intersection.h>
-#include <gmtl/Quat.h>
+
+#include <glm/vec3.hpp>
+#include <glm/gtx/transform.hpp>
+
+using namespace glm;
+
+#include "Ray.h"
+#include "AABox.h"
+#include "Sphere.h"
+#include "OBox.h"
+
+#include "Intersection.h"
+#include "Misc.h"
 
 #define DLL_EXPORT __declspec(dllexport)
 
 using namespace std;
-using namespace gmtl;
+using namespace glm;
 
 struct ColliderData {
-	Point3f* colliderPositions;
-	Vec3f* colliderSizes;
+	vec3* colliderPositions;
+	vec3* colliderSizes;
+	float* colliderOuterSphereRadius;
 	int* colliderTypes;
 	int colliderCount;
 };
@@ -29,58 +41,63 @@ struct ConstraintData {
 	int constraintCount;
 };
 
+// holds solver data to prevent re-initialization
+struct SolverData {
+	vec3 delta, distance, unitVector;
+	int startId;
+};
+
 //Solver data
 int _iterationCount = -1;
+SolverData _solverData;
 
 // tet mesh transforms
-Vec3f _tetMeshPosition = Vec3f();
-Quatf _tetMeshRotation = Quatf();
+vec3 _tetMeshPosition = vec3();
+vec3 _tetMeshRotation = vec3();
+// outer circle of tet mesh
+Sphere _tetMeshOuterSphere = Sphere();
 
 //vertex data
-Point3f* _previousVertexArray;
-Point3f* _vertexArray;
+vec3* _previousVertexArray;
+vec3* _vertexArray;
 int _vertexCount;
 
-//collider data
 ColliderData _collData;
-
-//constraint data
 ConstraintData _constraintData;
 
 // collision data
 int _currentCollidingVertexCount = 0;
+int _closeColliderCount = 0;
 int* _collidingVertices;
 
-bool isEqualQuatf(Quatf q1, Quatf q2) {
-	for (int i = 0; i < 4; i++)
-		if (q1.mData[i] != q2.mData[i]) return false;
-	return true;
+void init() {
+	_iterationCount = 0;
+	_solverData.startId = 0;
+	_solverData.delta = vec3();
+	_solverData.distance = vec3();
+	_solverData.unitVector = vec3();
 }
 
 void teardown() {
-	_tetMeshPosition = Vec3f();
-	_tetMeshRotation = Quatf();
-	_previousVertexArray = new Point3f();
-	_vertexArray = new Point3f();
+	_tetMeshPosition = vec3();
+	_tetMeshRotation = vec3();
+	_previousVertexArray = new vec3();
+	_vertexArray = new vec3();
 	_vertexCount = 0;
 	_collData = ColliderData();
+	_constraintData = ConstraintData();
+	_solverData = SolverData();
 	_currentCollidingVertexCount = 0;
+	_closeColliderCount = 0;
 }
-
-AABoxf makeAABox(Point3f position, Vec3f size) {
-	Point3f min = position - (size / 2.0f);
-	Point3f max = position + (size / 2.0f);
-	return AABoxf(min, max);
-}
-
 
 #pragma region collisions
-bool doesCollide(Point3f vertex, Point3f colliderPos, Vec3f colliderSize, int colliderType) {
+bool doesCollide(vec3 vertex, vec3 colliderPos, vec3 colliderSize, int colliderType) {
 	switch (colliderType) {
 	case -1: // default/unset
 		return false;
 	case 1: {//box
-		AABoxf aabb = makeAABox(colliderPos, colliderSize);
+		AABox aabb = AABox(colliderPos, colliderSize);
 		return intersect(aabb, vertex);
 	}
 	default:
@@ -88,16 +105,15 @@ bool doesCollide(Point3f vertex, Point3f colliderPos, Vec3f colliderSize, int co
 	}
 }
 
-Point3f collisionProjection(Point3f vertex, Point3f previousVertex, Point3f colliderPos, Vec3f colliderSize, int colliderType) {
+vec3 collisionProjection(vec3 vertex, vec3 previousVertex, vec3 colliderPos, vec3 colliderSize, int colliderType) {
 	// generate ray from current to previous vertex
-	Rayf line = Rayf(vertex, previousVertex - vertex);
+	Ray line = Ray(vertex, previousVertex - vertex);
 	switch (colliderType) {
 	case 1: {//box
-		AABoxf aabb = makeAABox(colliderPos, colliderSize);
-		float t_in = 0.0f, t_out = 0.0f;
-		unsigned int numHits = 0;
-		intersect(aabb, line, numHits, t_in, t_out);
-		return vertex + (previousVertex - vertex) * t_out;
+		AABox aabb = AABox(colliderPos, colliderSize);
+		vec3 in, out;
+		intersect(aabb, line, in, out);
+		return out;
 	}
 	default:
 		return vertex;
@@ -106,9 +122,17 @@ Point3f collisionProjection(Point3f vertex, Point3f previousVertex, Point3f coll
 
 void collisionHandling() {
 	int collCount = 0;
-	Point3f collPos = Point3f();
-	Vec3f collSize = Vec3f();
+	vec3 collPos = vec3();
+	vec3 collSize = vec3();
 	int collType = -1;
+	_closeColliderCount = 0;
+	Sphere colliderOuterSphere = Sphere();
+	Sphere tetMeshOuterSphere = Sphere(_tetMeshOuterSphere);
+	Sphere vertexOuterSphere = Sphere();
+
+	vec3 tempVert = vec3();
+
+	tetMeshOuterSphere._center += _tetMeshPosition;
 
 	//go over all colliders
 	for (int i = 0; i < _collData.colliderCount; i++) {
@@ -117,12 +141,30 @@ void collisionHandling() {
 		collPos = _collData.colliderPositions[i];
 		collSize = _collData.colliderSizes[i];
 
+		// skip collision handling when collider is not within range of tet mesh (check whether outer circles of collider and car intersect)
+		colliderOuterSphere._center = collPos;
+		colliderOuterSphere._radius = _collData.colliderOuterSphereRadius[i];
+
+		if (!intersect(tetMeshOuterSphere, colliderOuterSphere))
+			continue;
+		_closeColliderCount++;
+
 		//go over all vertices
 		for (int j = 0; j < _vertexCount; j++) {
-			//collision handling
-			if (doesCollide(_vertexArray[j], collPos, collSize, collType)) {
-				collCount++;
-				_vertexArray[j] = collisionProjection(_vertexArray[j], _previousVertexArray[j], collPos, collSize, collType);
+			vertexOuterSphere._center = _tetMeshPosition;
+			vertexOuterSphere._radius = length(_vertexArray[j]);
+			// coarse check (before applying rotation to vertex)
+			// define possible positions of rotated vertex with a description as a circle
+			if(intersect(vertexOuterSphere, colliderOuterSphere)) {
+				//collision handling
+				//transform vertex
+				vec3 vertex = rotate(_tetMeshRotation, _vertexArray[j], XYZ) + _tetMeshPosition;
+				if (doesCollide(vertex, collPos, collSize, collType)) {
+					collCount++;
+				//	tempVert = _vertexArray[j];
+				//	_vertexArray[j] = collisionProjection(vertex, _previousVertexArray[j], collPos, collSize, collType);
+				//	_previousVertexArray[j] = tempVert;
+				}
 			}
 		}
 	}
@@ -130,45 +172,79 @@ void collisionHandling() {
 }
 #pragma endregion collisions
 
-void solve() {
-	// get previous verts
+#pragma region solveing
+void solveConstraint(int index) {
+	// if (restValue == currentValue) return;
+	switch (_constraintData.constraintTypes[index]) {
+	case -1:
+		break;
+	case 0: { // distance
+		// determine distance
+		/*_solverData.startId = _constraintData.vertexStartIndeces[index];
+		_solverData.distance = vec3(_vertexArray[_solverData.startId] - _vertexArray[_solverData.startId + 1]);
+		_solverData.unitVector = _solverData.distance / length(_solverData.distance);
+		_solverData.delta = 0.5f * (length(_solverData.distance) - _constraintData.restValues[index]) * _solverData.unitVector;
+		// update vertex array
+		_vertexArray[_solverData.startId] -= delta;
+		_vertexArray[_solverData.startId + 1] += delta;*/
+		break;
+	}
+	case 1: // angle
+		break;
+	case 2: // volume
+		break;
+	}
+}
 
+void solveConstraints() {
+	for (int i = 0; i < _constraintData.constraintCount; i++) {
+		solveConstraint(i);
+	}
+}
+
+void solve() {
 	//handle collisions
 	collisionHandling();
 
+	// solve constraints
 	for (int i = 0; i < _iterationCount; i++) {
-		//for each constraint
-		//	constraint.solve();
-
+		solveConstraints();
 	}
-	// write velocity update 
+
+	// write velocity update
+		//???
 }
+#pragma endregion solver
 
 #pragma region Setters
 void setVertices(float* vertices, int vertCount) {
 	_vertexCount = vertCount;
-	_vertexArray = new Point3f[vertCount];
-	_previousVertexArray = new Point3f[vertCount];
+	_vertexArray = new vec3[vertCount];
+	_previousVertexArray = new vec3[vertCount];
 	for (int i = 0; i < vertCount; i++) {
-		for (int j = 0; j < 3; j++) {
-			_previousVertexArray[i] = _vertexArray[i];
-			_vertexArray[i].mData[j] = vertices[i * 3 + j];
-		}
+		_previousVertexArray[i] = _vertexArray[i];
+		_vertexArray[i].x = vertices[i * 3];
+		_vertexArray[i].y = vertices[i * 3 + 1];
+		_vertexArray[i].z = vertices[i * 3 + 2];
 	}
 }
 
 void setColliders(float* colliderPositions, float* colliderSizes, int* colliderTypes, int colliderCount) {
 	_collData.colliderCount = colliderCount;
-	_collData.colliderPositions = new Point3f[colliderCount];
-	_collData.colliderSizes = new Vec3f[colliderCount];
+	_collData.colliderPositions = new vec3[colliderCount];
+	_collData.colliderSizes = new vec3[colliderCount];
 	_collData.colliderTypes = new int[colliderCount];
+	_collData.colliderOuterSphereRadius = new float[colliderCount];
 
 	for (int i = 0; i < colliderCount; i++) {
 		_collData.colliderTypes[i] = colliderTypes[i];
-		for (int j = 0; j < 3; j++) {
-			_collData.colliderPositions[i].mData[j] = colliderPositions[i * 3 + j];
-			_collData.colliderSizes[i].mData[j] = colliderSizes[i * 3 + j];
-		}
+		_collData.colliderPositions[i].x = colliderPositions[i * 3];
+		_collData.colliderPositions[i].y = colliderPositions[i * 3 + 1];
+		_collData.colliderPositions[i].z = colliderPositions[i * 3 + 2];
+		_collData.colliderSizes[i].x = colliderSizes[i * 3];
+		_collData.colliderSizes[i].y = colliderSizes[i * 3 + 1];
+		_collData.colliderSizes[i].z = colliderSizes[i * 3 + 2];
+		_collData.colliderOuterSphereRadius[i] = length(_collData.colliderSizes[i])/2.0f;
 	}
 }
 
@@ -195,53 +271,49 @@ void setConstraints(int* vertexIds, int* vertexStartIndeces, int* vertexIdArrayL
 	}
 }
 
+void setTetMeshTransforms(float* translation, float* rotation) {
+	_tetMeshPosition = vec3(translation[0], translation[1], translation[2]);
+	_tetMeshRotation = vec3(rotation[0], rotation[1], rotation[2]);
+}
+
+void setOuterSphereData(float* center, float radius) {
+	_tetMeshOuterSphere._center = vec3(center[0], center[1], center[2]);
+	_tetMeshOuterSphere._radius = radius;
+}
 
 void applyTetMeshTransformation(float* translation, float* rotation) {
-	Point3f trans;
-	Quatf rot;
-	// create usable data objects
-	for (int i = 0; i < 3; i++) { trans.mData[i] = translation[i]; }
-	for (int i = 0; i < 4; i++) { rot.mData[i] = rotation[i]; }
+	vec3 trans;
+	vec3 rot;
+	trans = vec3(translation[0], translation[1], translation[2]);
+	rot = vec3(rotation[0], rotation[1], rotation[2]);
 
 	//determine differnces between old and new transfoms
-	bool positionIsEqual = true, rotationIsEqual = true;
-	positionIsEqual = (trans == _tetMeshPosition);
-	rotationIsEqual = isEqualQuatf(rot, _tetMeshRotation);
+	bool positionIsDifferent, rotationIsDifferent;
+	positionIsDifferent = (trans != _tetMeshPosition);
+	rotationIsDifferent = (rot != _tetMeshRotation);
 
 	//apply transforms
-	if (!positionIsEqual || !rotationIsEqual) {
+	if (positionIsDifferent || rotationIsDifferent) {
 		for (int i = 0; i < _vertexCount; i++) {
 			//undo old position
-			_vertexArray[i] += trans - _tetMeshPosition;
-			/*if (!rotationIsEqual) {
+			_vertexArray[i] -= _tetMeshPosition;
+			if (rotationIsDifferent) {
 				// undo old rotation
+				_vertexArray[i] = undoRotation(_tetMeshRotation, _vertexArray[i]);
 				// apply new rotation
-			}*/
+				_vertexArray[i] = rotate(rot, _vertexArray[i], XYZ);
+			}
 			// apply new position
-			//vertexArray[i] += trans;
+			_vertexArray[i] += trans;
 		}
-		_tetMeshPosition = trans;
-		_tetMeshRotation = rot;
 	}
+	setTetMeshTransforms(translation, rotation);
 }
 
 void setIterationCount(int iterationCount) {
 	_iterationCount = iterationCount;
 }
 #pragma endregion Setters
-
-#pragma region Getters
-Vec3f* getUntransformedVertices() {
-	Vec3f* untransformedVertices = new Vec3f[_vertexCount];
-	// copy and move and rotate each vertex
-	for (int i = 0; i < _vertexCount; i++) {
-		untransformedVertices[i] = _vertexArray[i] /*- tetMeshPosition*/;
-		// TODO: undo rotation per vertex
-		//untransformedVertices[i] = vertexArray[i];
-	}
-	return untransformedVertices;
-}
-#pragma endregion Getters
 
 // EXPORT FUNCTIONS
 extern "C" {
@@ -258,25 +330,28 @@ extern "C" {
 		setColliders(colliderPositions, colliderSizes, colliderTypes, colliderCount);
 	}
 
+	DLL_EXPORT void dll_setOuterSphereData(float* position, float radius) {
+		setOuterSphereData(position, radius);
+	}
+
 	DLL_EXPORT void dll_setTetMeshTransforms(float* translation, float* rotation) {
-		applyTetMeshTransformation(translation, rotation);
+		//applyTetMeshTransformation(translation, rotation);
+		setTetMeshTransforms(translation, rotation);
 	}
 
 	DLL_EXPORT void dll_setIterationCount(int iterationCount) {
 		setIterationCount(iterationCount);
 	}
-
 #pragma endregion Setters
 
 #pragma region Getters
 	DLL_EXPORT void dll_getVertices(int* outputArray) {
-		//memcpy(outputArray, getUntransformedVertices()->mData, vertexCount * 3 * sizeof(float));
-		memcpy(outputArray, _vertexArray->mData, _vertexCount * 3 * sizeof(float));
+		memcpy(outputArray, getVectorData(_vertexArray, _vertexCount), _vertexCount * 3 * sizeof(float));
 	}
 
 	DLL_EXPORT void dll_getColliders(int* positionOutput, int* sizeOutput, int* typeOutput) {
-		memcpy(positionOutput, _collData.colliderPositions->mData, _collData.colliderCount * 3 * sizeof(float));
-		memcpy(sizeOutput, _collData.colliderSizes->mData, _collData.colliderCount * 3 * sizeof(float));
+		memcpy(positionOutput, getVectorData(_collData.colliderPositions, _collData.colliderCount) , _collData.colliderCount * 3 * sizeof(float));
+		memcpy(sizeOutput, getVectorData(_collData.colliderSizes, _collData.colliderCount), _collData.colliderCount * 3 * sizeof(float));
 		memcpy(typeOutput, _collData.colliderTypes, _collData.colliderCount * sizeof(int));
 	}
 
@@ -286,23 +361,33 @@ extern "C" {
 
 	DLL_EXPORT int dll_getCollisionCount() {
 		return _currentCollidingVertexCount;
+		//return _closeColliderCount;
 	}
 
 	DLL_EXPORT void dll_getTetMeshTransforms(int* translationOutput, int* rotationOutput) {
-		memcpy(translationOutput, _tetMeshPosition.mData, 3 * sizeof(float));
-		memcpy(rotationOutput, _tetMeshRotation.mData.mData, 4 * sizeof(float));
+		memcpy(translationOutput, getVectorData(_tetMeshPosition), 3 * sizeof(float));
+		memcpy(rotationOutput, getVectorData(_tetMeshRotation), 3 * sizeof(float));
 	}
+
+	DLL_EXPORT int dll_getCloseColliderCount() {
+		return _closeColliderCount;
+	}
+
 #pragma endregion Getters
 
 #pragma region Calculations
 	DLL_EXPORT void dll_collisionHandling() {
 		collisionHandling();
 	}
-
+	
 	DLL_EXPORT void dll_solve() {
 		solve();
 	}
 #pragma endregion Calculations
+
+	DLL_EXPORT void dll_init() {
+		init();
+	}
 
 	DLL_EXPORT void dll_teardown() {
 		teardown();
