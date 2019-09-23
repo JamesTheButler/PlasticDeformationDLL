@@ -1,24 +1,27 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <algorithm>
+using namespace std;
 
 #include <glm/vec3.hpp>
 #include <glm/gtx/transform.hpp>
-
 using namespace glm;
+
+#include <tbb/parallel_for.h>
+ #include <tbb/blocked_range.h>
+using namespace tbb;
 
 #include "Ray.h"
 #include "AABox.h"
 #include "Sphere.h"
 #include "OBox.h"
-
 #include "Intersection.h"
 #include "Misc.h"
 
 #define DLL_EXPORT __declspec(dllexport)
 
-using namespace std;
-using namespace glm;
+const int size_t = 32;
 
 struct ColliderData {
 	vec3* colliderPositions;
@@ -120,6 +123,29 @@ vec3 collisionProjection(vec3 vertex, vec3 previousVertex, vec3 colliderPos, vec
 	}
 }
 
+void collisionCheck() {
+	vec3 collPos = vec3();
+	vec3 collSize = vec3();
+	Sphere colliderOuterSphere = Sphere();
+	//Sphere tetMeshOuterSphere = Sphere(_tetMeshOuterSphere);
+	//	Sphere vertexOuterSphere = Sphere();
+	int collType = -1;
+	for (int j = 0; j < _vertexCount; j++) {
+		//	vertexOuterSphere._center = _tetMeshPosition;
+		//	vertexOuterSphere._radius = length(_vertexArray[j]);
+		// coarse check (before applying rotation to vertex)
+		// define possible positions of rotated vertex with a description as a circle
+		//	if (intersect(vertexOuterSphere, colliderOuterSphere)) {
+			//collision handling
+			//transform vertex
+		vec3 vertex = rotate(_vertexArray[j], _tetMeshRotation) + _tetMeshPosition;
+		if (doesCollide(vertex, collPos, collSize, collType)) {
+			_currentCollidingVertexCount++;
+		}
+		//	}
+	}
+}
+
 void collisionHandling() {
 	int collCount = 0;
 	vec3 collPos = vec3();
@@ -149,8 +175,10 @@ void collisionHandling() {
 			continue;
 		_closeColliderCount++;
 
+		parallel_for(blocked_range<int>(0, 10), collisionCheck());
+
 		//go over all vertices
-		for (int j = 0; j < _vertexCount; j++) {
+		/*for (int j = 0; j < _vertexCount; j++) {
 			vertexOuterSphere._center = _tetMeshPosition;
 			vertexOuterSphere._radius = length(_vertexArray[j]);
 			// coarse check (before applying rotation to vertex)
@@ -158,7 +186,7 @@ void collisionHandling() {
 			if(intersect(vertexOuterSphere, colliderOuterSphere)) {
 				//collision handling
 				//transform vertex
-				vec3 vertex = rotate(_tetMeshRotation, _vertexArray[j], XYZ) + _tetMeshPosition;
+				vec3 vertex = rotate(_tetMeshRotation, _vertexArray[j]) + _tetMeshPosition;
 				if (doesCollide(vertex, collPos, collSize, collType)) {
 					collCount++;
 				//	tempVert = _vertexArray[j];
@@ -166,7 +194,7 @@ void collisionHandling() {
 				//	_previousVertexArray[j] = tempVert;
 				}
 			}
-		}
+		}*/
 	}
 	_currentCollidingVertexCount = collCount;
 }
@@ -299,9 +327,9 @@ void applyTetMeshTransformation(float* translation, float* rotation) {
 			_vertexArray[i] -= _tetMeshPosition;
 			if (rotationIsDifferent) {
 				// undo old rotation
-				_vertexArray[i] = undoRotation(_tetMeshRotation, _vertexArray[i]);
+				//_vertexArray[i] = undoRotation(_tetMeshRotation, _vertexArray[i]);
 				// apply new rotation
-				_vertexArray[i] = rotate(rot, _vertexArray[i], XYZ);
+				//_vertexArray[i] = rotate(rot, _vertexArray[i]);
 			}
 			// apply new position
 			_vertexArray[i] += trans;
