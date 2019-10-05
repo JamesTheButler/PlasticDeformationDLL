@@ -8,17 +8,14 @@ using namespace std;
 #include <glm/gtx/transform.hpp>
 using namespace glm;
 
-#include "Ray.h"
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+using namespace tbb;
+
 #include "AABox.h"
-#include "Sphere.h"
-#include "OBox.h"
 
 #include "Intersection.h"
 #include "Misc.h"
-
-#include "TBBTest.h"
-#include "ParallelProjector.h"
-#include "ParallelSolver.h"
 
 #define DLL_EXPORT __declspec(dllexport)
 
@@ -73,6 +70,8 @@ int* _collidingVertices;
 
 int _debugInt = 0;
 float _debugFloat = 0.0f;
+
+float _plasticityFactor = 0.0f;
 
 void init() {
 	_solverData.iterationCount = 0;
@@ -213,7 +212,6 @@ void sequentialProject(vec3 collPos, vec3 collSize, int collType) {
 			// transform it back into local space
 			_tempVertexArray[i] = revertRotation(vertex - _tetMeshPosition, _tetMeshRotation);
 		}
-
 	}
 	_debugInt = _collidingVertexCount;
 }
@@ -231,14 +229,23 @@ void parallelProject(vec3 collPos, vec3 collSize, int collType) {
 			vertex = projectOrthogonal(vertex, collPos, collSize, collType);
 			// transform it back into local space
 			_tempVertexArray[i] = revertRotation(vertex - _tetMeshPosition, _tetMeshRotation);
+			//_vertexArray[i] = revertRotation(vertex - _tetMeshPosition, _tetMeshRotation);
 		}
-
 	});
 	_debugInt = _collidingVertexCount;
 }
 
 void parallelSolveConstraints() {
-	ParallelSolver ps = ParallelSolver();
+	// for each changed vertex
+	//		get all constraints that influence vertex
+	//		determine deltaArray [p]
+	//			get current length and rest length of each constraint
+	//			rest_new = plasticityFactor * length_current + (1-plasticityFactor)*rest_old;
+	//			delta = 
+	//		apply deltaArray [p]
+	//			vec[i] += delta[i] / constraintPerVec[i];
+
+	// r_new = r_0 * plasticityFactor + r_curr * (1-plasticityFactor)
 }
 
 void getCollisionResult(int colliderId) {
@@ -248,11 +255,13 @@ void getCollisionResult(int colliderId) {
 	vec3 collSize = _collData.colliderSizes[colliderId];
 	int collType = _collData.colliderTypes[colliderId];
 	
+	// for int i to iterationCount
+
 	//sequentialProject(collPos, collSize, collType);
 	//sequentialSolveConstraints();
 
 	parallelProject(collPos, collSize, collType);
-	//parallelSolveConstraints();
+	parallelSolveConstraints();
 
 	//solveConstraints();
 }

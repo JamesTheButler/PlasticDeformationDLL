@@ -134,12 +134,6 @@
     <ClInclude Include="AABox.h" />
     <ClInclude Include="Intersection.h" />
     <ClInclude Include="Misc.h" />
-    <ClInclude Include="OBox.h" />
-    <ClInclude Include="ParallelSolver.h" />
-    <ClInclude Include="Ray.h" />
-    <ClInclude Include="Sphere.h" />
-    <ClInclude Include="ParallelProjector.h" />
-    <ClInclude Include="TBBTest.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

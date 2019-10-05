@@ -1,13 +1,5 @@
 #pragma once
 
-bool intersect(Sphere sphere, vec3 point) {
-	return distance(point, sphere._center) < sphere._radius;
-}
-
-bool intersect(Sphere sphere1, Sphere sphere2) {
-	return distance(sphere1._center, sphere2._center) < (sphere1._radius + sphere2._radius);
-}
-
 /// taken from the gmtl implementation @ http://ggt.sourceforge.net/html/main.html
 bool intersect(AABox box, vec3 point) {
 	// Look for a separating axis on each box for each axis
