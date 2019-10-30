@@ -132,6 +132,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AABox.h" />
+    <ClInclude Include="ColliderData.h" />
+    <ClInclude Include="ConstraintData.h" />
     <ClInclude Include="Intersection.h" />
     <ClInclude Include="Misc.h" />
   </ItemGroup>
