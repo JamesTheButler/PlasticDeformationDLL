@@ -5,36 +5,42 @@ enum EConstraintType {
 	BENDING = 1,
 	VOLUME = 2
 };
-
+//TODO: remove constraint count and current values
 class ConstraintData {
 public:
-	int constraintCount;
 	vector<vector<int>> vertexIds;
-	vector<float> currentValues;
 	vector<float> restValues;
 	vector<EConstraintType> constraintTypes;
-	vector<vector<int>> constraintsPerVertex;
+	vector<vector<int>> constraintsPerVertexOld;
+	vector<int> constraintsPerVertex;
 
 	int getConstraintCount() {
-		return constraintTypes.size();
+		return (int)constraintTypes.size();
 	}
 
 	void setConstraintCount(int newConstraintCount) {
-		constraintCount = newConstraintCount;
-		vertexIds.reserve(constraintCount);
-		currentValues.reserve(constraintCount);
-		restValues.reserve(constraintCount);
-		constraintTypes.reserve(constraintCount);
+		vertexIds.reserve(newConstraintCount);
+		restValues.reserve(newConstraintCount);
+		constraintTypes.reserve(newConstraintCount);
 	}
 
 	void addConstraint(vector<int> vertIDs, float restValue, EConstraintType constraintType) {
-		int constraintID = vertIDs.size();
+		//sort for faster searching
+		sort(vertIDs.begin(), vertIDs.end());
+		// check if constraint exists already
+		for (int constraintId : constraintsPerVertexOld[vertIDs[0]]) {
+			if (vertexIds[constraintId] == vertIDs)	// if exists: skip adding
+				return;
+		}
+		// add constraint
+		constraintsPerVertex[vertIDs[0]]++;
+		constraintsPerVertex[vertIDs[1]]++;
+		int constraintID = (int)vertexIds.size();
 		vertexIds.push_back(vertIDs);
-		currentValues.push_back(restValue);
 		restValues.push_back(restValue);
 		constraintTypes.push_back(constraintType);
 		for (int i = 0; i < vertIDs.size(); i++) {
-			constraintsPerVertex.at(vertIDs[i]).push_back(constraintID);
+			constraintsPerVertexOld[vertIDs[i]].push_back(constraintID);
 		}
 	}
 
@@ -42,7 +48,7 @@ public:
 	int getVertexIdSize() {
 		int flatSize = 0;
 		for (auto& v : vertexIds) {
-			flatSize += v.size();
+			flatSize += (int)v.size();
 		}
 		return flatSize;
 	}
