@@ -6,7 +6,7 @@ enum EConstraintType {
 	VOLUME = 2
 };
 //TODO: remove constraint count and current values
-class ConstraintData {
+class DistanceConstraintData {
 public:
 	vector<vector<int>> vertexIds;
 	vector<float> restValues;

@@ -27,16 +27,14 @@ vec3 _tetMeshRotation = vec3();
 //vertex data
 vector<vec3> _vertices;
 vector<int> _tetrahedra;
-vector<vec3> _tempVertices;
 vector<int> _surfaceVertexIndeces;
 vector<int> _surfaceTriangles;
 
-ConstraintData _constraintData;
+DistanceConstraintData _distanceConstraintData;
+DistanceConstraintData _volumeConstraintData;
 ColliderData _collData;
 
 vector<vec3> _deltas;
-vector<float> _TEST_currentDistance;
-vector<float> _TEST_newRest;
 
 int _collidingVertexCount = 0;
 int _iterationCount = 0;
@@ -54,11 +52,11 @@ void teardown() {
 	_tetMeshPosition = vec3();
 	_tetMeshRotation = vec3();
 	_collData = ColliderData();
-	_constraintData = ConstraintData();
+	_distanceConstraintData = DistanceConstraintData();
+	_volumeConstraintData = DistanceConstraintData();
 	_collidingVertexCount = 0;
 
 	vector<vec3>().swap(_vertices);
-	vector<vec3>().swap(_tempVertices);
 	vector<int>().swap(_tetrahedra);
 	vector<int>().swap(_surfaceVertexIndeces);
 	vector<int>().swap(_surfaceTriangles);
@@ -117,11 +115,9 @@ void projectVertices(vec3 collPos, vec3 collSize, int collType) {
 			_collidingVertexCount++;
 			vertex = projectOrthogonal(vertex, collPos, collSize, collType);
 			// transform it back into local space
-			//_tempVertices[i] = revertRotation(vertex - _tetMeshPosition, _tetMeshRotation);
 			_vertices[i] = revertRotation(vertex - _tetMeshPosition, _tetMeshRotation);
 		}
 	});
-	_debugInt = _collidingVertexCount;
 }
 
 
@@ -130,45 +126,23 @@ void solveConstraints() {
 	// clear _deltas
 	int vertCount = _vertices.size();
 	vector<vec3>(vertCount, vec3(0,0,0)).swap(_deltas);
-	vector<float>(vertCount, 0.0f).swap(_TEST_currentDistance);
-	vector<float>(vertCount, 0.0f).swap(_TEST_newRest);
 	// compute deltas
-	_debugFloat = _plasticityFactor;
-
-	parallel_for((size_t)0, (size_t)(_constraintData.vertexIds.size() - 1), (size_t)1, [=](size_t i) {
-		int id0 = _constraintData.vertexIds[i][0];
-		int id1 = _constraintData.vertexIds[i][1];
+	parallel_for((size_t)0, (size_t)(_distanceConstraintData.vertexIds.size() - 1), (size_t)1, [=](size_t i) {
+		int id0 = _distanceConstraintData.vertexIds[i][0];
+		int id1 = _distanceConstraintData.vertexIds[i][1];
 		float currentDistance = distance(_vertices[id0], _vertices[id1]);
-		float newRest = _plasticityFactor * currentDistance + (1.0f - _plasticityFactor) * _constraintData.restValues[i];
+		float newRest = _plasticityFactor * currentDistance + (1.0f - _plasticityFactor) * _distanceConstraintData.restValues[i];
 		vec3 delta = ((_vertices[id0] - _vertices[id1]) / currentDistance) * (newRest - currentDistance) / 2.0f;
 		_deltas[id0] = - delta;
 		_deltas[id1] = + delta;
 	});
-
-	parallel_for((size_t)0, (size_t)(_constraintData.vertexIds.size() - 1), (size_t)1, [=](size_t i) {
-		_vertices[i] += _deltas[i] / (float)_constraintData.constraintsPerVertexOld[i].size();
-	});
-
-/*
+	// apply deltas
 	parallel_for((size_t)0, (size_t)(_vertices.size() - 1), (size_t)1, [=](size_t i) {
-		parallel_for((size_t)0, (size_t)(_constraintData.constraintsPerVertex[i].size() - 1), (size_t)1, [=](size_t j) {
-			int constraintID = _constraintData.constraintsPerVertex[i][j];
-			int id0 = _constraintData.vertexIds[constraintID][0];
-			int id1 = _constraintData.vertexIds[constraintID][1];
-			float currentDistance = distance(_vertices[id0], _vertices[id1]);
-			//_TEST_currentDistance[i] = currentDistance;
-			float newRest = _plasticityFactor * currentDistance + (1.0f - _plasticityFactor)*_constraintData.restValues[constraintID];
-			//_TEST_newRest[i] = newRest;
-			//_debugFloat = currentDistance
-			_deltas[i] = (newRest - currentDistance) / 2.0f;		// div by 2 to move both vertices in the same distance
-		});
-	});*/
-	// move vertices
+		_vertices[i] += _deltas[i] / (float)_distanceConstraintData.constraintsPerVertex[i];
+	});
 }
 
 void getCollisionResult(int colliderId) {
-	_debugInt = 0;
-	
 	vec3 collPos = _collData.colliderPositions[colliderId];
 	vec3 collSize = _collData.colliderSizes[colliderId];
 	int collType = _collData.colliderTypes[colliderId];
@@ -229,7 +203,7 @@ vector<int> indexSubsetVertices(vector<vec3> subSet, vector<vec3> superSet) {
 }
 
 void generateConstraints(vector<int> tetrahedra) {
-	_constraintData.setConstraintCount((int)tetrahedra.size() * 6);
+	_distanceConstraintData.setConstraintCount((int)tetrahedra.size() * 6);
 	vec3 tetVertices[4];
 	int tetVertexIDs[4];
 	vector<int> tempIds(2,0);
@@ -245,22 +219,22 @@ void generateConstraints(vector<int> tetrahedra) {
 		// generate distance constraints along each tetrahedron edge
 		tempIds[0] = tetVertexIDs[0];
 		tempIds[1] = tetVertexIDs[1];
-		_constraintData.addConstraint(tempIds,distance(tetVertices[0], tetVertices[1]), DISTANCE);
+		_distanceConstraintData.addConstraint(tempIds,distance(tetVertices[0], tetVertices[1]), DISTANCE);
 		tempIds[0] = tetVertexIDs[0];
 		tempIds[1] = tetVertexIDs[2];
-		_constraintData.addConstraint(tempIds, distance(tetVertices[0], tetVertices[2]), DISTANCE);
+		_distanceConstraintData.addConstraint(tempIds, distance(tetVertices[0], tetVertices[2]), DISTANCE);
 		tempIds[0] = tetVertexIDs[0];
 		tempIds[1] = tetVertexIDs[3];
-		_constraintData.addConstraint(tempIds, distance(tetVertices[0], tetVertices[3]), DISTANCE);
+		_distanceConstraintData.addConstraint(tempIds, distance(tetVertices[0], tetVertices[3]), DISTANCE);
 		tempIds[0] = tetVertexIDs[1];
 		tempIds[1] = tetVertexIDs[2];
-		_constraintData.addConstraint(tempIds, distance(tetVertices[1], tetVertices[2]), DISTANCE);
+		_distanceConstraintData.addConstraint(tempIds, distance(tetVertices[1], tetVertices[2]), DISTANCE);
 		tempIds[0] = tetVertexIDs[1];
 		tempIds[1] = tetVertexIDs[3];
-		_constraintData.addConstraint(tempIds, distance(tetVertices[1], tetVertices[3]), DISTANCE);
+		_distanceConstraintData.addConstraint(tempIds, distance(tetVertices[1], tetVertices[3]), DISTANCE);
 		tempIds[0] = tetVertexIDs[2];
 		tempIds[1] = tetVertexIDs[3];
-		_constraintData.addConstraint(tempIds, distance(tetVertices[2], tetVertices[3]), DISTANCE);
+		_distanceConstraintData.addConstraint(tempIds, distance(tetVertices[2], tetVertices[3]), DISTANCE);
 	}
 	// clean up
 	vector<int>().swap(tempIds);
@@ -269,14 +243,12 @@ void generateConstraints(vector<int> tetrahedra) {
 void setTetMeshData(float* vertices, int vertexCount, int* tetrahedra, int tetCount, float* surfaceVertices, int surfaceVertCount, int* surfaceTriangles, int surfaceTriCount) {
 	// vertices
 	_vertices.reserve(vertexCount);
-	_tempVertices.reserve(vertexCount);
 	vec3 temporaryVertex;
 	for (int i = 0; i < vertexCount; i++) {
 		temporaryVertex.x = vertices[i * 3];
 		temporaryVertex.y = vertices[i * 3 + 1];
 		temporaryVertex.z = vertices[i * 3 + 2];
 		_vertices.push_back(temporaryVertex);
-		_tempVertices.push_back(vec3(0, 0, 0));
 	}
 	// tetrahedra
 	_tetrahedra.reserve(tetCount);
@@ -301,14 +273,14 @@ void setTetMeshData(float* vertices, int vertexCount, int* tetrahedra, int tetCo
 	_surfaceVertexIndeces.reserve(surfaceVertCount);
 	_surfaceVertexIndeces = indexSubsetVertices(tempSurfaceVertices, _vertices);
 	// set up vertex-to-constrain look up
-	_constraintData.constraintsPerVertexOld.reserve(vertexCount);
-	_constraintData.constraintsPerVertex.resize(vertexCount, 0);
+	_distanceConstraintData.constraintsPerVertexOld.reserve(vertexCount);
+	_distanceConstraintData.constraintsPerVertex.resize(vertexCount, 0);
 	vector<int> filler(0);
 	for (int i = 0; i < vertexCount; i++) {
-		_constraintData.constraintsPerVertexOld.push_back(filler);
+		_distanceConstraintData.constraintsPerVertexOld.push_back(filler);
 	}
 	// generate constraints
-//	generateConstraints(_tetrahedra);
+	generateConstraints(_tetrahedra);
 	//clean up
 	vector<vec3>().swap(tempSurfaceVertices);
 }
@@ -348,12 +320,7 @@ extern "C" {
 	DLL_EXPORT void dll_getVertices(int* vertexOutput) {
 		vector<float> result;
 		getVectorData(_vertices, result);
-		memcpy(vertexOutput, result.data(), _tempVertices.size() * 3 * sizeof(float));
-	}
-	DLL_EXPORT void dll_getTempVertices(int* vertexOutput) {
-		vector<float> result;
-		getVectorData(_tempVertices, result);
-		memcpy(vertexOutput, result.data(), _tempVertices.size() * 3 * sizeof(float));
+		memcpy(vertexOutput, result.data(), _vertices.size() * 3 * sizeof(float));
 	}
 	DLL_EXPORT int dll_getSurfVertexCount() {
 		return (int)_surfaceVertexIndeces.size();
@@ -385,17 +352,17 @@ extern "C" {
 		memcpy(typeOutput, _collData.colliderTypes.data(), _collData.colliderCount * sizeof(int));
 	}
 	DLL_EXPORT int dll_getConstraintCount() {
-		return (int)_constraintData.vertexIds.size();
+		return (int)_distanceConstraintData.vertexIds.size();
 	}
 	DLL_EXPORT void dll_getConstraintRestValues(int* output) {
-		memcpy(output, _constraintData.restValues.data(), (int)_constraintData.restValues.size() * sizeof(int));
+		memcpy(output, _distanceConstraintData.restValues.data(), (int)_distanceConstraintData.restValues.size() * sizeof(int));
 	}
 
 	DLL_EXPORT void dll_getConstraints(int* vertexIndecesOutput) {
 
 	}
 	DLL_EXPORT void dll_getConstraintTypes(int* outputArray) {
-		memcpy(outputArray, _constraintData.constraintTypes.data(), (int)_constraintData.constraintTypes.size() * sizeof(int));
+		memcpy(outputArray, _distanceConstraintData.constraintTypes.data(), (int)_distanceConstraintData.constraintTypes.size() * sizeof(int));
 	}
 	DLL_EXPORT int dll_getCollisionCount() {
 		return _collidingVertexCount;
@@ -414,6 +381,15 @@ extern "C" {
 #pragma region Calculations
 	DLL_EXPORT void dll_getCollisionResult(int collId) {
 		getCollisionResult(collId);
+	}
+	DLL_EXPORT void dll_project(int collId) {
+		vec3 collPos = _collData.colliderPositions[collId];
+		vec3 collSize = _collData.colliderSizes[collId];
+		int collType = _collData.colliderTypes[collId];
+		projectVertices(collPos, collSize, collType);
+	}
+	DLL_EXPORT void dll_solveConstraints() {
+		solveConstraints();
 	}
 #pragma endregion Calculations
 #pragma region setup/setdown
@@ -441,19 +417,13 @@ extern "C" {
 	DLL_EXPORT bool dll_testVertexAABoxIntersection(float* vertex, float* cPos, float* cSize) {
 		return intersect(AABox(vec3(cPos[0], cPos[1], cPos[2]), vec3(cSize[0], cSize[1], cSize[2])), vec3(vertex[0], vertex[1], vertex[2]));
 	}
-	DLL_EXPORT void dll_getTestCurrDist(int* output) {
-		memcpy(output, _TEST_currentDistance.data(), _TEST_currentDistance.size() * sizeof(float));
-	}
-	DLL_EXPORT void dll_getTestNewRest(int* output) {
-		memcpy(output, _TEST_newRest.data(), _TEST_newRest.size() * sizeof(float));
-	}
 	DLL_EXPORT int dll_getConstraintPerVertexCount(int id) {
-		id = std::min(id, (int)_constraintData.constraintsPerVertexOld.size()-1);
-		return (int) _constraintData.constraintsPerVertexOld[id].size();
+		id = std::min(id, (int)_distanceConstraintData.constraintsPerVertexOld.size()-1);
+		return (int) _distanceConstraintData.constraintsPerVertexOld[id].size();
 	}
 	DLL_EXPORT void dll_getConstraintPerVertex(int id, int* output) {
-		id = std::min(id, (int)_constraintData.constraintsPerVertexOld.size()-1);
-		memcpy(output, _constraintData.constraintsPerVertexOld[id].data(), _constraintData.constraintsPerVertexOld[id].size() * sizeof(int));
+		id = std::min(id, (int)_distanceConstraintData.constraintsPerVertexOld.size()-1);
+		memcpy(output, _distanceConstraintData.constraintsPerVertexOld[id].data(), _distanceConstraintData.constraintsPerVertexOld[id].size() * sizeof(int));
 	}
 #pragma endregion tests
 }
