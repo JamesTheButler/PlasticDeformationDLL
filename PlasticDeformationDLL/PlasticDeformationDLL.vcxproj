@@ -132,10 +132,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AABox.h" />
+    <ClInclude Include="BarycentricMapping.h" />
     <ClInclude Include="ColliderData.h" />
-    <ClInclude Include="ConstraintData.h" />
+    <ClInclude Include="DistanceConstraintData.h" />
     <ClInclude Include="Intersection.h" />
     <ClInclude Include="Misc.h" />
+    <ClInclude Include="Types.h" />
+    <ClInclude Include="VolumeConstraintData.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

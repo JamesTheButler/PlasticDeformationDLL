@@ -30,3 +30,7 @@ vec3 rotate(vec3 vector, vec3 eulerAngles) {
 	mat4 zRot = glm::rotate(eulerAngles[2] * pi<float>() / 180.0f, vec3(0, 0, 1));
 	return vec3(yRot*xRot*zRot*vec4(vector, 0));
 }
+
+float getTetrahedronVolume(vec3 p1, vec3 p2, vec3 p3, vec3 p4) {
+	return abs(dot(cross(p2 - p1, p3 - p1), p4 - p1) / 6.0f);
+}
