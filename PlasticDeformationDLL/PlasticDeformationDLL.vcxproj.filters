@@ -41,7 +41,13 @@
     <ClInclude Include="BarycentricMapping.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Types.h">
+    <ClInclude Include="Solver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileReader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileWriter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

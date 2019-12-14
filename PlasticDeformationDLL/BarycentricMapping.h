@@ -1,22 +1,17 @@
-#include "glm/detail/type_mat4x4.hpp"
+#pragma once
 
 // Determinant of a mat4x4 defined by 4 row vectors (vec3)
 float determinant4x4(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3) {
-	return determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(v2, 1), vec4(v3, 1));
-}
-
-// Determinant of a mat4x4 defined by 4 row vectors (vec4)
-float determinant4x4(const vec4& v0, const vec4& v1, const vec4& v2, const vec4& v3) {
-	return determinant(mat4x4(v0, v1, v2, v3));
+	return determinant(mat4x4(vec4(v0, 1), vec4(v1, 1), vec4(v2, 1), vec4(v3, 1)));
 }
 
 // Calc barycentric coord of a vertex with respect to 4 verts v0-v3 (of a tetrahedron)
 vec4 getBarycentricCoordinate(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3, const vec3& vertex) {
-	const float determinantTet = determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(v2, 1), vec4(v3, 1));
-	const float determinant_p0 = determinant4x4(vec4(vertex, 1), vec4(v1, 1), vec4(v2, 1), vec4(v3, 1));
-	const float determinant_p1 = determinant4x4(vec4(v0, 1), vec4(vertex, 1), vec4(v2, 1), vec4(v3, 1));
-	const float determinant_p2 = determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(vertex, 1), vec4(v3, 1));
-	const float determinant_p3 = determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(v2, 1), vec4(vertex, 1));
+	const float determinantTet = determinant4x4(v0, v1, v2, v3);
+	const float determinant_p0 = determinant4x4(vertex, v1, v2, v3);
+	const float determinant_p1 = determinant4x4(v0, vertex, v2, v3);
+	const float determinant_p2 = determinant4x4(v0, v1, vertex, v3);
+	const float determinant_p3 = determinant4x4(v0, v1, v2, vertex);
 	vec4 bCoord;
 	bCoord.x = (determinant_p0 / determinantTet);
 	bCoord.y = (determinant_p1 / determinantTet);
@@ -27,11 +22,11 @@ vec4 getBarycentricCoordinate(const vec3& v0, const vec3& v1, const vec3& v2, co
 
 // Find out if point p lays inside a tetrahedron (represented by 4 vectors)
 bool isVertexInsideTetrahedron(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3, const vec3& vertex) {
-	const float determinantTet = determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(v2, 1), vec4(v3, 1));
-	const float determinant_p0 = determinant4x4(vec4(vertex, 1), vec4(v1, 1), vec4(v2, 1), vec4(v3, 1));
-	const float determinant_p1 = determinant4x4(vec4(v0, 1), vec4(vertex, 1), vec4(v2, 1), vec4(v3, 1));
-	const float determinant_p2 = determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(vertex, 1), vec4(v3, 1));
-	const float determinant_p3 = determinant4x4(vec4(v0, 1), vec4(v1, 1), vec4(v2, 1), vec4(vertex, 1));
+	const float determinantTet = determinant4x4(v0, v1, v2, v3);
+	const float determinant_p0 = determinant4x4(vertex, v1, v2, v3);
+	const float determinant_p1 = determinant4x4(v0, vertex, v2, v3);
+	const float determinant_p2 = determinant4x4(v0, v1, vertex, v3);
+	const float determinant_p3 = determinant4x4(v0, v1, v2, vertex);
 	// if determinantTet == 0 -> tetrahedron is coplanar
 	if (determinantTet != 0) {
 		// if all determinants are of the same sign as the tet's determinant, the vertex is inside
@@ -48,75 +43,198 @@ bool isVertexInsideTetrahedron(const vec3& v0, const vec3& v1, const vec3& v2, c
 	}
 	return false;
 }
-
+// Gets center point of a tetrahedron (represented by its 4 verts).
 vec3 getCenterOfTetrahedron(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3) {
 	return (v0 + v1 + v2 + v3) / 4.0f;
 }
 
 // Gets the distance between the center of a tetrahedron (represented by its 4 verts) and a vertex.
 float getVertexDistanceToTetrahedronCenter(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3, const vec3& vertex) {
-	return (getCenterOfTetrahedron(v0, v1, v2, v3) - vertex).length();
+	return glm::length(getCenterOfTetrahedron(v0, v1, v2, v3) - vertex);
 }
 
-// Finds the barycentric coordinates for a vector of input vertices
-void findBaryCentricCoordinatedForVertices(
+// Finds the ID of a vec3 'v' in a list of vectors 'set'. Allowed difference is specified by 'delta'. If v does not exist in 'set', returns -1.
+int findIdOfSimilar(const vec3& v, const vector<vec3>& set, float delta) {
+	int id = -1;
+	parallel_for((size_t)0, set.size(), [&](size_t &i) {
+		if ((abs(set[i].x - v.x) < delta) && (abs(set[i].y - v.y) < delta) && (abs(set[i].z - v.z) < delta)) {
+			id = i;
+			task::self().cancel_group_execution();
+		}
+	});
+	return id;
+}
+
+
+// For each sub set vec3, the function finds the id of the identical vec3 in the super set. If no identical vector3 exists, the id will be set to -1.
+void indexSubsetVertices(const vector<vec3> &subSet, vector<vec3>& superSet, vector<int>& indeces) {
+	indeces.resize(subSet.size(), -1);
+	parallel_for((size_t)0, subSet.size(), [&](size_t &i) {
+		indeces[i] = findIdOfSimilar(subSet[i], superSet, 0.01f);
+	});
+}
+
+
+// Generates barycentric mapping for a set of input vertices and a tetrahedral mesh.
+void findBaryCentricCoordinatedForVerticesWithMapping(
 	const vector<vec3>& inputVertices,
-	const vector<vec3>& vertices,
-	const vector<vector<int>> &tetVertexIds,
+	const vector<vec3>& tetMeshVertices,
+	const vector<ivec4> &tetrahedraVertexIds,
+	const vector<int> &surfaceToTetMeshVertexMap,
 	vector<vec4>& barycentricCoords,
 	vector<int>& barycentricTetrahedronIds) {
 
-	barycentricCoords.reserve(inputVertices.size());
-	barycentricTetrahedronIds.reserve(inputVertices.size());
+	barycentricCoords.resize(inputVertices.size(), vec4());
+	barycentricTetrahedronIds.resize(inputVertices.size(), 0);
 
+	float result = 0.0f;
 	float minDistance;
 	unsigned int closestTetrahedronIndex;
-	for (auto vertex = inputVertices.begin(); vertex < inputVertices.end(); vertex++) {
+	bool isInside;
+	parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {		//for each input vertex
 		minDistance = FLT_MAX;
-		for (int i = 0; i < tetVertexIds.size(); i++) {
-			vec3 v0 = vertices[tetVertexIds[i][0]];
-			vec3 v1 = vertices[tetVertexIds[i][1]];
-			vec3 v2 = vertices[tetVertexIds[i][2]];
-			vec3 v3 = vertices[tetVertexIds[i][3]];
-			if (isVertexInsideTetrahedron(v0, v1, v2, v3, *vertex)) {
-				barycentricCoords.push_back(getBarycentricCoordinate(v0, v1, v2, v3, *vertex));
-				barycentricTetrahedronIds.push_back(i);
-			} else {
-				float distance = getVertexDistanceToTetrahedronCenter(v0, v1, v2, v3, *vertex);
-				if (distance < minDistance) {
-					minDistance = distance;
-					closestTetrahedronIndex = i;
+		isInside = false;
+		// check for surface vertex-tet mesh vertex mapping
+		if (surfaceToTetMeshVertexMap [vertex] != -1) {
+			barycentricCoords[vertex] = vec4();
+			barycentricTetrahedronIds[vertex] = -1;
+		}
+		else {		//if surface vertex is NOT mapped to tet mesh vetex
+			parallel_for((size_t)0, tetrahedraVertexIds.size(), (size_t)1, [&](size_t tet) {// for each tetrahedron	
+				if (!isInside) {	// skip further iterations if vertex is inside tetrahedron (for the lack of tbb::parallel_break)
+					ivec4 tetMeshVertexId = tetrahedraVertexIds[tet];
+					vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+					vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+					vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+					vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+					if (isVertexInsideTetrahedron(v0, v1, v2, v3, inputVertices[vertex])) {	// if vertex is inside a tetrahedron of the tet mesh, set barycentric coords of it
+						barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, inputVertices[vertex]);
+						barycentricTetrahedronIds[vertex] = tet;
+						isInside = true;
+						task::self().cancel_group_execution();
+					}
+					else {	// if vert is NOT inside a tetraheron, find closest tetrahedron
+						float distance = getVertexDistanceToTetrahedronCenter(v0, v1, v2, v3, inputVertices[vertex]);
+						if (distance < minDistance) {
+							minDistance = distance;
+							closestTetrahedronIndex = tet;
+						}
+					}
 				}
+			});
+
+			if (!isInside) {			// set closest tetrahedron as barycentric tetrahedron
+				ivec4 tetMeshVertexId = tetrahedraVertexIds[closestTetrahedronIndex];
+				vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+				vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+				vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+				vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+				barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, inputVertices[vertex]);
+				barycentricTetrahedronIds[vertex] = closestTetrahedronIndex;
 			}
 		}
-		vec3 v0 = vertices[tetVertexIds[closestTetrahedronIndex][0]];
-		vec3 v1 = vertices[tetVertexIds[closestTetrahedronIndex][1]];
-		vec3 v2 = vertices[tetVertexIds[closestTetrahedronIndex][2]];
-		vec3 v3 = vertices[tetVertexIds[closestTetrahedronIndex][3]];
-		barycentricCoords.push_back(getBarycentricCoordinate(v0, v1, v2, v3, *vertex));
-		barycentricTetrahedronIds.push_back(closestTetrahedronIndex);
-	}
+	});
 }
+
+void findBaryCentricCoordinatedForVertices(
+	const vector<vec3>& inputVertices,
+	const vector<vec3>& tetMeshVertices,
+	const vector<ivec4> &tetrahedraVertexIds,
+	vector<vec4>& barycentricCoords,
+	vector<int>& barycentricTetrahedronIds) {
+
+	barycentricCoords.resize(inputVertices.size(), vec4());
+	barycentricTetrahedronIds.resize(inputVertices.size(), 0);
+
+	float result = 0.0f;
+	float minDistance;
+	unsigned int closestTetrahedronIndex;
+	bool isInside;
+	parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {		//for each input vertex
+		minDistance = FLT_MAX;
+		isInside = false;
+		parallel_for((size_t)0, tetrahedraVertexIds.size(), (size_t)1, [&](size_t tet) {// for each tetrahedron	
+			if (!isInside) {	// skip further iterations if vertex is inside tetrahedron (for the lack of tbb::parallel_break)
+				ivec4 tetMeshVertexId = tetrahedraVertexIds[tet];
+				vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+				vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+				vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+				vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+				if (isVertexInsideTetrahedron(v0, v1, v2, v3, inputVertices[vertex])) {	// if vertex is inside a tetrahedron of the tet mesh, set barycentric coords of it
+					barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, inputVertices[vertex]);
+					barycentricTetrahedronIds[vertex] = tet;
+					isInside = true;
+					task::self().cancel_group_execution();
+				}
+				else {	// if vert is NOT inside a tetraheron, find closest tetrahedron
+					float distance = getVertexDistanceToTetrahedronCenter(v0, v1, v2, v3, inputVertices[vertex]);
+					if (distance < minDistance) {
+						minDistance = distance;
+						closestTetrahedronIndex = tet;
+					}
+				}
+			}
+		});
+
+		if (!isInside) {			// set closest tetrahedron as barycentric tetrahedron
+			ivec4 tetMeshVertexId = tetrahedraVertexIds[closestTetrahedronIndex];
+			vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+			vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+			vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+			vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+			barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, inputVertices[vertex]);
+			barycentricTetrahedronIds[vertex] = closestTetrahedronIndex;
+		}
+	});
+}
+
 
 // Calculates the position represented by a barycentric coordinate.
 vec3 getPositionByBarycentricCoord(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3, const vec4& barycentricCoord) {
 	return v0 * barycentricCoord.x + v1 * barycentricCoord.y + v2 * barycentricCoord.z + v3 * barycentricCoord.w;
 }
 
+// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
 void updateSurfaceVertices(
-	const vector<vec3>& inputVertices,
-	const vector<vec3>& vertices,
-	const vector<vector<int>> &tetVertexIds,
+	vector<vec3>& inputVertices,
+	const vector<vec3>& tetMeshVertices,
+	const vector<ivec4> &tetVertexIds,
 	const vector<vec4>& barycentricCoords,
-	const vector<int>& barycentricTetIds,
-	vector<vec3>& outputVertices) {
+	const vector<int>& barycentricTetIds) {
 
-	outputVertices.reserve(inputVertices.size());
-	for (int inputVertId = 0;  inputVertId<inputVertices.size(); inputVertId++) {
-		vec3 v0 = vertices[tetVertexIds[barycentricTetIds[inputVertId]][0]];
-		vec3 v1 = vertices[tetVertexIds[barycentricTetIds[inputVertId]][1]];
-		vec3 v2 = vertices[tetVertexIds[barycentricTetIds[inputVertId]][2]];
-		vec3 v3 = vertices[tetVertexIds[barycentricTetIds[inputVertId]][3]];
-		outputVertices.push_back(getPositionByBarycentricCoord(v0,v1,v2,v3, barycentricCoords[inputVertId]));
-	}
+	parallel_for((size_t)0, (size_t)inputVertices.size(), (size_t)1, [&](size_t vertex) {
+		// get positions of related verts
+		ivec4 tetMeshVertexId = tetVertexIds[barycentricTetIds[vertex]];
+		vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+		vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+		vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+		vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+		inputVertices[vertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[vertex]);
+	});
+}
+
+// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
+void updateSurfaceVerticesWithMapping(
+	vector<vec3>& surfaceVertices,
+	const vector<vec3>& tetMeshVertices,
+	const vector<ivec4> &tetMeshTetrahedra,
+	const vector<int> &surfaceToTetMeshVertexMap,
+	const vector<vec4>& barycentricCoords,
+	const vector<int>& barycentricTetIds){
+
+	parallel_for((size_t) 0, (size_t)surfaceVertices.size(), (size_t) 1, [&](size_t vertex){
+		//TODO: if surf2tetMap != -1  inputervertices  = tetmeshvertices
+		if (surfaceToTetMeshVertexMap[vertex] != -1) {
+			surfaceVertices[vertex] = tetMeshVertices[surfaceToTetMeshVertexMap[vertex]];
+		}
+		else {
+			// get positions of related verts
+			ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[vertex]];
+			vec3 v0 = tetMeshVertices[tetMeshTetrahedron.x];
+			vec3 v1 = tetMeshVertices[tetMeshTetrahedron.y];
+			vec3 v2 = tetMeshVertices[tetMeshTetrahedron.z];
+			vec3 v3 = tetMeshVertices[tetMeshTetrahedron.w];
+			surfaceVertices[vertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[vertex]);
+		}
+	});
 }

@@ -7,7 +7,11 @@ public:
 	vector<tuple<int, int, int, int>> vertexIds;
 	vector<float> restValues;
 	vector<int> constraintsPerVertex;
-	int constraintCount;
+	size_t constraintCount;
+
+	~VolumeConstraintData() {
+		cleanUp();
+	}
 
 	void cleanUp() {
 		vector<tuple<int, int, int, int>>().swap(vertexIds);

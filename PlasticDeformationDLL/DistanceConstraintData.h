@@ -8,8 +8,12 @@ public:
 	vector<float> restValues;
 	vector<int> constraintCountPerVertex;
 	vector<vector<int>> constraintsPerVertex;
-	int constraintCount;
-	   
+	size_t constraintCount;
+
+	~DistanceConstraintData() {
+		cleanUp();
+	}
+
 	void cleanUp() {
 		vector<pair<int, int>>().swap(vertexIds);
 		vector<float>().swap(restValues);
@@ -46,7 +50,7 @@ public:
 		// add data, if constraint does not exist yet
 		if (doesConstraintExist(vertexIDs))
 			return;
-		int constraintId = vertexIds.size();
+		int constraintId = (int)vertexIds.size();
 		vertexIds.push_back(vertexIDs);
 		restValues.push_back(restValue);
 		// setup vertex-constraint lookup & constraints per vertex
