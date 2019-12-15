@@ -412,8 +412,8 @@ extern "C" {
 	}
 	DLL_EXPORT void dll_getSurfaceVertices(int* output) {
 		// get vertex positions for barycentric mapping
-		//updateSurfaceVerticesWithMapping(_surfaceVertices, _vertices, _tetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
-		updateSurfaceVertices(_surfaceVertices, _vertices, _tetrahedra, _barycentricCoordinates, _barycentricTetIds);
+		updateSurfaceVerticesWithMapping(_surfaceVertices, _vertices, _tetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
+		//updateSurfaceVertices(_surfaceVertices, _vertices, _tetrahedra, _barycentricCoordinates, _barycentricTetIds);
 		// get float list of vector data
 		vector<float> result;
 		getVectorData(_surfaceVertices, result);
