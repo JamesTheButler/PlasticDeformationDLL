@@ -91,8 +91,6 @@ public:
 		mMaxSubSizeName = 8;
 	}
 
-
-
 	/**
 	*  Default destructor
 	*/
@@ -102,7 +100,6 @@ public:
 			pop_back();
 		}
 	}
-
 
 	inline double GetTotalTime() { return mTotalTime; }
 	inline double GetGlobalTime() { return mGlobalTime; }
@@ -116,8 +113,6 @@ public:
 	*  @param ProfileNode* parent to affect
 	*/
 	void SetParent(ProfileNode* _parent) { mParent = _parent; }
-
-
 
 	/**
 	*  Get Parent of this node
