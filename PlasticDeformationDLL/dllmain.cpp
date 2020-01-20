@@ -15,7 +15,8 @@ using namespace glm;
 #include <tbb/blocked_range.h>
 using namespace tbb;
 
-#include "Profiler/profile.h"
+//#include "Profiler/profile.h"
+#include "Logger.h"
 
 #include "AABox.h"
 #include "Intersection.h"
@@ -48,7 +49,9 @@ vector<vec3> _distanceDeltas;
 vector<vec3> _volumeDeltas;
 ColliderData _collData;
 
-string _filePath;
+string _projectPath;
+string _tetrahedralizationPath;
+string _logPath;
 string _fileName;
 
 float _solverDeltaTime = 0;
@@ -287,6 +290,7 @@ void generateConstraints(
 	DistanceConstraintData &distanceConstraintData, 
 	VolumeConstraintData &volumeConstraintData) {
 
+	logger::log("--generateConstraints");
 	int vertexCount = vertices.size();
 	// set up vertex-to-constrain look up
 	distanceConstraintData.constraintCountPerVertex.resize(vertexCount, 0);
@@ -330,9 +334,13 @@ void generateConstraints(
 	distanceConstraintData.vertexIds.resize(distanceConstraintData.vertexIds.size());
 	distanceConstraintData.restValues.resize(distanceConstraintData.vertexIds.size());
 	distanceConstraintData.constraintCount = distanceConstraintData.vertexIds.size();
+	
+	logger::log("\t -D-constraints:" + to_string(_distanceConstraintData.constraintCount) + ",\t V-constraints: " + to_string(_volumeConstraintData.constraintCount));
 }
 
 void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
+	logger::log("--setSurfaceVertices");
+	logger::log("\t -surface verts:" + to_string(surfaceVertCount));
 	// surface Vertices
 	_surfaceVertices.resize(surfaceVertCount, vec3(0,0,0));
 	parallel_for((size_t)0, (size_t)surfaceVertCount, (size_t)1, [&](size_t &i) {
@@ -342,27 +350,17 @@ void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
 		vertex.z = surfaceVertices[i * 3 + 2];
 		_surfaceVertices[i] = vertex;
 	});
-	/* TODO: do in "GO!"-Function
-	// load file with surface mapping or generate mapping
-	string fullFileName = _filePath + _fileName + ".tetmesh";
-	if (fileExists(fullFileName)) {
-		parseFile_tetmesh(fullFileName, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
-	}
-	else {
-		indexSubsetVertices(_surfaceVertices, _vertices, _surfaceVertexToTetVertexMap);
-		findBaryCentricCoordinatedForVerticesWithMapping(_surfaceVertices, _vertices, _tetrahedra, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
-		//findBaryCentricCoordinatedForVertices(_surfaceVertices, _vertices, _tetrahedra, _barycentricCoordinates, _barycentricTetIds);
-		//writeTetMeshDataToFile(_surfaceVertices, _vertices, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
-		writeTetMeshDataToFile(_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
-	}*/
 }
 
-void setTetMeshData(
+//TODO: old -> remove
+/* void setTetMeshData(
 	float* vertices,
 	int vertexCount,
 	int* tetrahedra,
 	int tetCount) {
 
+	logger::log("--setTetMeshData ");
+	logger::log("\t -verts:"+to_string(vertexCount)+", \t tets:" +to_string(tetCount));
 	// vertices
 	_vertices.resize(vertexCount, vec3(0,0,0));
 	parallel_for((size_t)0, (size_t)vertexCount, (size_t)1, [&](size_t i) {
@@ -382,20 +380,22 @@ void setTetMeshData(
 		tet[3] = tetrahedra[i * 4 + 3];
 		_tetrahedra[i] = tet;
 	});
-	
-}
+}*/
 
 bool init() {
-	/*realm::GetProfiler()->StartProfile("");
-	realm::PROFILE_SAMPLE("init");
-	writeProfilerToFile();*/
-	//_filePath = "C:\\Users\\Tom\\Documents\\Eigene Dateien\\Studium\\Master Schweden\\9 Master Thesis\\MasterThesisPrototype\\Tetrahedralization\\";
-	string tetMeshFilePath = _filePath + _fileName + ".obj.mesh";
-	string surfaceFilePath = _filePath + _fileName + ".tetMesh";
-	fileWriter::writeToFile(_filePath+"test.log", tetMeshFilePath+"\n"+ surfaceFilePath, true);
-	if (!fileReader::fileExists(tetMeshFilePath))
+	logger::log("--init");
+	// generate file paths
+	string tetMeshFilePath = _tetrahedralizationPath + _fileName + ".obj.mesh";
+	string surfaceFilePath = _tetrahedralizationPath + _fileName + ".tetMesh";
+	logger::log("\t-reading files.. "+tetMeshFilePath + " " + surfaceFilePath);
+	// read tet mesh file
+	logger::log("\t-parsing tet mesh data file");
+	if (!fileReader::fileExists(tetMeshFilePath)) {
+		logger::logError("\t\t" + tetMeshFilePath + " does not exist");
 		return false;
+	}
 	fileReader::parseFile_obj_mesh(tetMeshFilePath, _vertices, _tetrahedra);
+	//generate constraints
 	generateConstraints(
 		_vertices,
 		_tetrahedra,
@@ -403,16 +403,23 @@ bool init() {
 		_volumeConstraintData);
 	_distanceDeltas.resize(_vertices.size(), vec3());
 	_volumeDeltas.resize(_vertices.size(), vec3());
+	logger::log("\t-constraints generated.. ");
+	logger::log("\t-parsing surface mesh data file");
+	// Read / generate surface data file
 	if (fileReader::fileExists(surfaceFilePath)) {		// read surface mapping file
+		logger::log("\t\t surface data file exists parsed");
 		fileReader::parseFile_tetmesh(
 			surfaceFilePath,
 			_surfaceVertexToTetVertexMap,
 			_barycentricCoordinates,
 			_barycentricTetIds);
-		return true;
+		logger::log("\t\t" + surfaceFilePath + " parsed");
 	}
-	else {			
-		return false;// generate mapping
+	else {
+		logger::log("\t\t" + surfaceFilePath + " does not exist");
+		// find tetmesh vertices that map directly to surface vertices
+		vectorFuncs::indexSubsetVertices(_surfaceVertices, _vertices, _surfaceVertexToTetVertexMap);
+		// generate barycentric mapping for other surfaceVertices
 		bcmapping::findBaryCentricCoordinatedForVerticesWithMapping(
 			_surfaceVertices,
 			_vertices,
@@ -420,8 +427,8 @@ bool init() {
 			_surfaceVertexToTetVertexMap,
 			_barycentricCoordinates,
 			_barycentricTetIds);
-		//fileWriter::writeTetMeshDataToFile(_surfaceVertices, _vertices, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
 		fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
+		logger::log("\t\t" + surfaceFilePath + " generated");
 	}
 	return true;
 }
@@ -439,9 +446,10 @@ extern "C" {
 	DLL_EXPORT void dll_setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) 		{
 		setSurfaceVertices(surfaceVertices, surfaceVertCount);
 	}
-	DLL_EXPORT void dll_setTetMeshData(float* vertices, int vertexCount, int* tetrahedra, int tetCount) {
+	//TODO: old -> remove
+	/*DLL_EXPORT void dll_setTetMeshData(float* vertices, int vertexCount, int* tetrahedra, int tetCount) {
 		setTetMeshData(vertices, vertexCount, tetrahedra, tetCount);
-	}
+	}*/
 	DLL_EXPORT void dll_setColliders(float* colliderPositions, float* colliderSizes, int* colliderTypes, int colliderCount) {
 		setColliders(colliderPositions, colliderSizes, colliderTypes, colliderCount);
 	}
@@ -454,7 +462,10 @@ extern "C" {
 	}
 	DLL_EXPORT void dll_setFilePath(const char* path, int charCount) {
 		//_filePath = path;
-		_filePath = vectorFuncs::charPtrToString(path, charCount);
+		_projectPath = vectorFuncs::charPtrToString(path, charCount);
+		_tetrahedralizationPath = _projectPath + "Tetrahedralization/";
+		_logPath = _projectPath + "Logs/";
+		logger::setFilePath(_logPath);
 	}
 #pragma endregion Setters
 #pragma region Getters
@@ -563,6 +574,12 @@ extern "C" {
 	}
 	DLL_EXPORT void dll_teardown() {
 		teardown();
+	}
+	DLL_EXPORT void dll_toggleLoggingOn() {
+		logger::setActive(true);
+	}
+	DLL_EXPORT void dll_toggleLoggingOff() {
+		logger::setActive(false);
 	}
 #pragma endregion setup/setdown
 #pragma region tests

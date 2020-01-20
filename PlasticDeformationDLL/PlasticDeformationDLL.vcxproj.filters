@@ -18,9 +18,6 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
-    <ClCompile Include="Profiler\profile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AABox.h">
@@ -53,21 +50,8 @@
     <ClInclude Include="FileWriter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Profiler\profile.h">
+    <ClInclude Include="Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Profiler\profile_node.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Profiler\timer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Profiler\TimingCPU.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Profiler\TimingGPU.cuh" />
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="Profiler\TimingGPU.cu" />
   </ItemGroup>
 </Project>

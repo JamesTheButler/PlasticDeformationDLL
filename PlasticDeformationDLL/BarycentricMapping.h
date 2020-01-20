@@ -63,6 +63,8 @@ namespace bcmapping {
 		vector<vec4>& barycentricCoords,
 		vector<int>& barycentricTetrahedronIds) {
 
+		logger::log("--findBaryCentricCoordinatedForVerticesWithMapping");
+
 		barycentricCoords.resize(inputVertices.size(), vec4());
 		barycentricTetrahedronIds.resize(inputVertices.size(), 0);
 
@@ -70,10 +72,12 @@ namespace bcmapping {
 		float minDistance;
 		unsigned int closestTetrahedronIndex;
 		bool isInside;
+
 		parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {		//for each input vertex
 			minDistance = FLT_MAX;
 			isInside = false;
 			// check for surface vertex-tet mesh vertex mapping
+
 			if (surfaceToTetMeshVertexMap[vertex] != -1) {
 				barycentricCoords[vertex] = vec4();
 				barycentricTetrahedronIds[vertex] = -1;

@@ -8,16 +8,6 @@
 #include <glm/gtx/transform.hpp>
 
 namespace fileWriter {
-	void writeToFile(const string &filePath, const string &text, bool doOverwrite) {
-		std::ofstream outputFile;
-		if(doOverwrite)
-			outputFile.open(filePath, std::ofstream::app);
-		else
-			outputFile.open(filePath, std::ofstream::trunc);
-		outputFile << text;
-		outputFile.close();
-	}
-
 	void writeTetMeshDataToFile(
 		const string &filePath,
 		//	const std::vector<glm::vec3> &surfVerts,
@@ -27,6 +17,7 @@ namespace fileWriter {
 		const std::vector<glm::vec4> &barycentricCoords,
 		const std::vector<int> &barycentricTetIds) {
 
+		logger::log("--writeTetMeshDataToFile");
 		std::ofstream outputFile;
 		//std::string filePath = "F:\\Eigene Dateien\\Studium\\Master Schweden\\9 Master Thesis\\Practical\\MasterThesisPrototype\\Assets\\output.tetmesh";
 		outputFile.open(filePath);

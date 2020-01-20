@@ -41,6 +41,8 @@ namespace fileReader {
 
 	// Parses a given .mesh file into a list of tet mesh vertices and tet mesh tetrahedra.
 	void parseFile_obj_mesh(const string &fileName, vector<vec3> &tetMeshVerts, vector<ivec4> &tetMeshTets) {
+
+		logger::log("--parseFile_obj_mesh");
 		ifstream inputFileStream(fileName);
 		string line;
 
@@ -94,6 +96,7 @@ namespace fileReader {
 				break;
 			}
 		}
+		logger::log("\t -file parsed .. tet mesh vert count: " + to_string(tetMeshVerts.size())+", tet mesh tets: " + to_string(tetMeshTets.size()));
 	}
 
 	// Parses a given .tetmesh file into barycentric coordinates and a mapping of surface vertices to tet mesh vertices.
@@ -102,10 +105,11 @@ namespace fileReader {
 		vector<vec4>& barycentricCoords,
 		vector<int>& barycentricTetrahedronIds) {
 
+		logger::log("-- parseFile_tetmesh");
+
 		FileReadMode frm = NONE;
 		string line;
 		ifstream inputFileStream(fileName);
-
 		while (getline(inputFileStream, line)) {
 			// check for new line read mode
 			string readModeIdentifier = line.substr(0, 3);
@@ -118,21 +122,25 @@ namespace fileReader {
 			else if (readModeIdentifier == "bct") {
 				frm = BC_TETID;
 			}
-			// interpret line
-			vector<string> v;
-			switch (frm) {
-			case SURF_TO_TET_VERT_MAP:		//line: 0
-				surfaceToTetMeshVertexMap.push_back(stoi(line));
-				break;
-			case BC_COORD:		//line: 0.0 0.0 0.0 0.0
-				v = splitString(line, ' ');
-				barycentricCoords.push_back(vec4(stoi(v[0]), stoi(v[1]), stoi(v[2]), stoi(v[3])));
-				break;
-			case BC_TETID:		//line: 0
-				v = splitString(line, ' ');
-				barycentricTetrahedronIds.push_back(stoi(line));
-				break;
+			else {
+				// interpret line
+				switch (frm) {
+				case SURF_TO_TET_VERT_MAP:		//line: 0
+					surfaceToTetMeshVertexMap.push_back(stoi(line));
+					break;
+				case BC_COORD:		//line: 0.0 0.0 0.0 0.0
+					{	vector<string>v = splitString(line, ' ');
+						barycentricCoords.push_back(vec4(stof(v[0]), stof(v[1]), stof(v[2]), stof(v[3])));	}
+					break;
+				case BC_TETID:		//line: 0
+					barycentricTetrahedronIds.push_back(stoi(line));
+					break;
+				default: 
+					break;
+				}
 			}
 		}
+		logger::log("\t -file parsed .. s2t-map count: " + to_string(surfaceToTetMeshVertexMap.size()) + ", BC vert count: " + to_string(barycentricCoords.size()) + ", BC tet count: " + to_string(barycentricTetrahedronIds.size()));
+		//logger::log("\t -file parsed .. s2t-map count: " + to_string(surfaceToTetMeshVertexMap.size()));
 	}
 }

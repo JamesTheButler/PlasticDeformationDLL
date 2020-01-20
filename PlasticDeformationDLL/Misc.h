@@ -60,6 +60,8 @@ namespace vectorFuncs {
 
 	// For each sub set vec3, the function finds the id of the identical vec3 in the super set. If no identical vector3 exists, the id will be set to -1.
 	void indexSubsetVertices(const vector<vec3> &subSet, vector<vec3>& superSet, vector<int>& indeces) {
+		logger::log("--indexSubsetVertices");
+		logger::log("\t -subset count:"+ to_string(subSet.size())+",\t superSet count: "+ to_string(superSet.size()));
 		indeces.resize(subSet.size(), -1);
 		parallel_for((size_t)0, subSet.size(), [&](size_t &i) {
 			indeces[i] = findIdOfSimilar(subSet[i], superSet, 0.01f);

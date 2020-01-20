@@ -53,7 +53,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.1.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.2.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -90,11 +90,11 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\Tools\NVIDIA\CUDA\include;C:\Program Files %28x86%29\Tools\IntelSWTools\compilers_and_libraries_2019.4.245\windows\tbb\include;C:\local\glm-0.9.9.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WINDLL;USE_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Program Files\Tools\NVIDIA\CUDA\include;C:\Program Files %28x86%29\Tools\Development\IntelSWTools\compilers_and_libraries_2019.5.281\windows\tbb\include;C:\local\glm-0.9.9.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_WINDLL;USE_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Program Files\Tools\NVIDIA\CUDA\lib\x64;C:\Program Files %28x86%29\Tools\IntelSWTools\compilers_and_libraries_2019.4.245\windows\tbb\lib\intel64_win\vc14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\Tools\NVIDIA\CUDA\lib\x64;C:\Program Files %28x86%29\Tools\Development\IntelSWTools\compilers_and_libraries_2019.5.281\windows\tbb\lib\intel64_win\vc14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cuda.lib;tbb.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -131,7 +131,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="Profiler\profile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AABox.h" />
@@ -141,20 +140,13 @@
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="FileWriter.h" />
     <ClInclude Include="Intersection.h" />
+    <ClInclude Include="Logger.h" />
     <ClInclude Include="Misc.h" />
-    <ClInclude Include="Profiler\profile.h" />
-    <ClInclude Include="Profiler\profile_node.h" />
-    <ClInclude Include="Profiler\timer.h" />
-    <ClInclude Include="Profiler\TimingCPU.h" />
-    <ClInclude Include="Profiler\TimingGPU.cuh" />
     <ClInclude Include="Solver.h" />
     <ClInclude Include="VolumeConstraintData.h" />
   </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="Profiler\TimingGPU.cu" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.1.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 10.2.targets" />
   </ImportGroup>
 </Project>
