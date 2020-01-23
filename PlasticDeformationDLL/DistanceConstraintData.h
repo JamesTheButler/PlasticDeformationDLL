@@ -1,6 +1,11 @@
 #pragma once
 #include <set>
 #include <tuple>
+#include <vector>
+#include <glm/vec3.hpp>
+
+using namespace std;
+using namespace glm;
 
 class DistanceConstraintData {
 public:

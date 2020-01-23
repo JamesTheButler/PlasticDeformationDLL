@@ -1,4 +1,6 @@
 #pragma once
+#include <glm/vec3.hpp>
+using namespace glm;
 
 class AABox {
 public:

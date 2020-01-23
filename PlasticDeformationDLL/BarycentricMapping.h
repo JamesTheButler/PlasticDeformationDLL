@@ -1,4 +1,13 @@
 #pragma once
+#include <vector>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <tbb/parallel_for.h>
+#include "Logger.h"
+
+using namespace tbb;
+using namespace std;
+using namespace glm;
+
 namespace bcmapping {
 	// Determinant of a mat4x4 defined by 4 row vectors (vec3)
 	float determinant4x4(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3) {
@@ -177,7 +186,7 @@ namespace bcmapping {
 	}
 
 	// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
-	void updateSurfaceVertices(
+	/*void updateSurfaceVertices(
 		vector<vec3>& inputVertices,
 		const vector<vec3>& tetMeshVertices,
 		const vector<ivec4> &tetVertexIds,
@@ -193,7 +202,7 @@ namespace bcmapping {
 			vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
 			inputVertices[vertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[vertex]);
 		});
-	}
+	}*/
 
 	// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
 	void updateSurfaceVerticesWithMapping(
@@ -203,6 +212,8 @@ namespace bcmapping {
 		const vector<int> &surfaceToTetMeshVertexMap,
 		const vector<vec4>& barycentricCoords,
 		const vector<int>& barycentricTetIds) {
+
+		logger::log("--updateSurfaceVerticesWithMapping");
 
 		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t vertex) {
 			//TODO: if surf2tetMap != -1  inputervertices  = tetmeshvertices
@@ -219,5 +230,6 @@ namespace bcmapping {
 				surfaceVertices[vertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[vertex]);
 			}
 		});
+		logger::log("\t-done");
 	}
 }

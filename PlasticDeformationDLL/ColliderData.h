@@ -1,4 +1,9 @@
 #pragma once
+#include <vector>
+#include <glm/vec3.hpp>
+
+using namespace std;
+using namespace glm;
 
 struct ColliderData {
 	vector<vec3> colliderPositions;

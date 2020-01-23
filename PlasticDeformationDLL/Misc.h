@@ -1,4 +1,13 @@
 #pragma once
+#include <vector>
+#include <glm/gtx/transform.hpp>
+#include <tbb/parallel_for.h>
+#include "Logger.h"
+
+using namespace std;
+using namespace glm;
+using namespace tbb;
+
 namespace vectorFuncs {
 	// Gets a vec4 vectors data as a concurrent float array.
 	void getVectorData(const vector<vec4> &vectors, vector<float> &result) {

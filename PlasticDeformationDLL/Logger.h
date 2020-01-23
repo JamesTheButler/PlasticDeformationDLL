@@ -1,7 +1,12 @@
 #pragma once
 #include <ctime>
+#include <string>
+#include <fstream>
 #include <iostream>
 #include <chrono>
+
+using namespace std;
+
 namespace logger {
 	string logFilePath;
 	bool isActive=false;
@@ -28,7 +33,7 @@ namespace logger {
 		if (!isActive)
 			return;
 		string time = getTime(true);
-		ofstream ofs(logFilePath.c_str(), std::ios_base::out | std::ios_base::app);
+		ofstream ofs(logFilePath.c_str(), ios_base::out | ios_base::app);
 		ofs << time << '\t' << text << '\n';
 		ofs.close();
 	}

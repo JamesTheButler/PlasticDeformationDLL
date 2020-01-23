@@ -1,6 +1,9 @@
 #pragma once
 #include <set>
 #include <tuple>
+#include <vector>
+
+using namespace std;
 
 class VolumeConstraintData {
 public:

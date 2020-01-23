@@ -1,7 +1,11 @@
 #pragma once
 
+#include <glm/vec3.hpp>
+#include "AABox.h"
+
+
 /// taken from the gmtl implementation @ http://ggt.sourceforge.net/html/main.html
-bool intersect(AABox box, vec3 point) {
+bool intersect(AABox box, glm::vec3 point) {
 	// Look for a separating axis on each box for each axis
 	if (box.getMin()[0] > point[0])  return false;
 	if (box.getMin()[1] > point[1])  return false;

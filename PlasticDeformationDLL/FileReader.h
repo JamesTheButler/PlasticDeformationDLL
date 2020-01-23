@@ -1,13 +1,21 @@
 #pragma once
-enum FileReadMode {
-	NONE = 0,
-	BC_COORD = 1,
-	BC_TETID = 2,
-	SURF_TO_TET_VERT_MAP = 3,
-	TET_MESH_VERT = 4,
-	TET_MESH_TET = 5,
-};
+#include <vector>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include "Logger.h"
+using namespace std;
+using namespace glm;
+
 namespace fileReader {
+	enum FileReadMode {
+		NONE = 0,
+		BC_COORD = 1,
+		BC_TETID = 2,
+		SURF_TO_TET_VERT_MAP = 3,
+		TET_MESH_VERT = 4,
+		TET_MESH_TET = 5,
+	};
+
 	// Splits up a string into a list of tokens via a given delimiter.
 	const vector<string> splitString(const string& str, const char& delim) {
 		string buffer{ "" };
@@ -35,7 +43,7 @@ namespace fileReader {
 
 	// Checks if a file at a given fileName exists.
 	bool fileExists(string path) {
-		std::ifstream ifile(path);
+		ifstream ifile(path);
 		return ifile.good();
 	}
 

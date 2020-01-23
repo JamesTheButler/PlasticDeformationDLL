@@ -5,19 +5,15 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-using namespace std;
 
 #include <glm/gtx/transform.hpp>
-using namespace glm;
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_for_each.h>
 #include <tbb/blocked_range.h>
-using namespace tbb;
 
 //#include "Profiler/profile.h"
 #include "Logger.h"
-
 #include "AABox.h"
 #include "Intersection.h"
 #include "Misc.h"
@@ -28,6 +24,10 @@ using namespace tbb;
 #include "BarycentricMapping.h"
 #include "FileReader.h"
 #include "FileWriter.h"
+
+using namespace std;
+using namespace glm;
+using namespace tbb;
 
 #define DLL_EXPORT __declspec(dllexport)
 
@@ -64,7 +64,7 @@ int _debugInt = 0;
 float _debugFloat = 0.0f;
 
 void writeProfilerToFile() {
-	/*std::ofstream op(_filePath + _fileName + ".profile");
+	/*ofstream op(_filePath + _fileName + ".profile");
 	realm::GetProfiler()->GetRootNode()->DisplayFlatStats(op);*/
 }
 
@@ -246,7 +246,7 @@ void getCollisionResult(int colliderId) {
 	}
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
-	_solverDeltaTime = std::chrono::duration_cast<chrono::milliseconds>(duration).count();
+	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
 }
 #pragma endregion solver
 
@@ -427,7 +427,8 @@ bool init() {
 			_surfaceVertexToTetVertexMap,
 			_barycentricCoordinates,
 			_barycentricTetIds);
-		fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
+		//fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
+		fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertices, _vertices, _tetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
 		logger::log("\t\t" + surfaceFilePath + " generated");
 	}
 	return true;
@@ -489,12 +490,15 @@ extern "C" {
 		return (int)_surfaceVertices.size();
 	}
 	DLL_EXPORT void dll_getSurfaceVertices(int* output) {
+		logger::log("--dll_getSurfaceVertices");
 		// get vertex positions for barycentric mapping
 		bcmapping::updateSurfaceVerticesWithMapping(_surfaceVertices, _vertices, _tetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
-		//updateSurfaceVertices(_surfaceVertices, _vertices, _tetrahedra, _barycentricCoordinates, _barycentricTetIds);
 		// get float list of vector data
+		logger::log("\t-get data from vector");
 		vector<float> result;
 		vectorFuncs::getVectorData(_surfaceVertices, result);
+		logger::log("\t-copy data to unity");
+
 		memcpy(output, result.data(), _surfaceVertices.size() * 3 * sizeof(float));
 	}
 	DLL_EXPORT void dll_getBarycentricCoords(int* barycentricCoordOutput) {
