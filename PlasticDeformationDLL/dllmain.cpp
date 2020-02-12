@@ -492,11 +492,13 @@ extern "C" {
 	DLL_EXPORT void dll_getSurfaceVertices(int* output) {
 		logger::log("--dll_getSurfaceVertices");
 		// get vertex positions for barycentric mapping
-		bcmapping::updateSurfaceVerticesWithMapping(_surfaceVertices, _vertices, _tetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
+		vector<vec3> newSurfVerts;
+		newSurfVerts.resize(_surfaceVertices.size());
+		bcmapping::updateSurfaceVerticesWithMapping(newSurfVerts, _vertices, _tetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
 		// get float list of vector data
 		logger::log("\t-get data from vector");
 		vector<float> result;
-		vectorFuncs::getVectorData(_surfaceVertices, result);
+		vectorFuncs::getVectorData(newSurfVerts, result);
 		logger::log("\t-copy data to unity");
 
 		memcpy(output, result.data(), _surfaceVertices.size() * 3 * sizeof(float));
