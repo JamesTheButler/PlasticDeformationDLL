@@ -407,21 +407,20 @@ namespace bcmapping {
 
 		logger::log("--updateSurfaceVerticesWithMapping");
 
-		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t vertex) {
-			//TODO: if surf2tetMap != -1  inputervertices  = tetmeshvertices
-			if (surfaceToTetMeshVertexMap[vertex] != -1) {
-				surfaceVertices[vertex] = tetMeshVertices[surfaceToTetMeshVertexMap[vertex]];
+		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t surfVertex) {
+			if (surfaceToTetMeshVertexMap[surfVertex] != -1) {
+				surfaceVertices[surfVertex] = tetMeshVertices[surfaceToTetMeshVertexMap[surfVertex]];
 			}
 			else {
 				// get positions of related verts
-				ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[vertex]];
+				ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[surfVertex]];
 				vec3 v0 = tetMeshVertices[tetMeshTetrahedron.x];
 				vec3 v1 = tetMeshVertices[tetMeshTetrahedron.y];
 				vec3 v2 = tetMeshVertices[tetMeshTetrahedron.z];
 				vec3 v3 = tetMeshVertices[tetMeshTetrahedron.w];
-				surfaceVertices[vertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[vertex]);
+				surfaceVertices[surfVertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[surfVertex]);
 			}
 		});
-		logger::log("\t-done");
+		//logger::log("\t-done");
 	}
 }
