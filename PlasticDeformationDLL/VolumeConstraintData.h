@@ -7,7 +7,7 @@ using namespace std;
 
 class VolumeConstraintData {
 public:
-	vector<tuple<int, int, int, int>> vertexIds;
+	vector<ivec4> vertexIds;
 	vector<float> restValues;
 	vector<int> constraintsPerVertex;
 	size_t constraintCount;
@@ -17,18 +17,18 @@ public:
 	}
 
 	void cleanUp() {
-		vector<tuple<int, int, int, int>>().swap(vertexIds);
+		vector<ivec4>().swap(vertexIds);
 		vector<float>().swap(restValues);
 		vector<int>().swap(constraintsPerVertex);
 	}
 
-	void addConstraint(tuple<int, int, int, int> vertexIDs, float restValue) {
+	void addConstraint(ivec4 vertexIDs, float restValue) {
 		vertexIds.push_back(vertexIDs);
 		restValues.push_back(restValue);
-		constraintsPerVertex[get<0>(vertexIDs)]++;
-		constraintsPerVertex[get<1>(vertexIDs)]++;
-		constraintsPerVertex[get<2>(vertexIDs)]++;
-		constraintsPerVertex[get<3>(vertexIDs)]++;
+		constraintsPerVertex[vertexIDs.x]++;
+		constraintsPerVertex[vertexIDs.y]++;
+		constraintsPerVertex[vertexIDs.z]++;
+		constraintsPerVertex[vertexIDs.w]++;
 	}
 
 	// Returns flat array of the data of vertexIds.
@@ -36,10 +36,10 @@ public:
 		vector<int> flat;
 		flat.reserve(vertexIds.size() * 4);
 		for (auto& v : vertexIds) {
-			flat.push_back(get<0>(v));
-			flat.push_back(get<1>(v));
-			flat.push_back(get<2>(v));
-			flat.push_back(get<3>(v));
+			flat.push_back(v.x);
+			flat.push_back(v.y);
+			flat.push_back(v.z);
+			flat.push_back(v.w);
 		}
 		return flat.data();
 	}

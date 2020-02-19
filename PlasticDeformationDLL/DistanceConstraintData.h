@@ -9,7 +9,7 @@ using namespace glm;
 
 class DistanceConstraintData {
 public:
-	vector<pair<int, int>> vertexIds;
+	vector<ivec2> vertexIds;
 	vector<float> restValues;
 	vector<int> constraintCountPerVertex;
 	vector<vector<int>> constraintsPerVertex;
@@ -20,7 +20,7 @@ public:
 	}
 
 	void cleanUp() {
-		vector<pair<int, int>>().swap(vertexIds);
+		vector<ivec2>().swap(vertexIds);
 		vector<float>().swap(restValues);
 		vector<int>().swap(constraintCountPerVertex);
 		vector<vector<int>>().swap(constraintsPerVertex);
@@ -32,24 +32,24 @@ public:
 		restValues.resize(constraintCount);
 	}
 	
-	pair<int, int> sortVertexIds(pair<int, int> vertexIds) {
-		if (vertexIds.first > vertexIds.second) {
-			int temp = vertexIds.second;
-			vertexIds.second = vertexIds.first;
-			vertexIds.first = temp;
+	ivec2 sortVertexIds(ivec2 vertexIds) {
+		if (vertexIds.x > vertexIds.y) {
+			int temp = vertexIds.y;
+			vertexIds.y = vertexIds.x;
+			vertexIds.x = temp;
 		}
 		return vertexIds;
 	}
 
-	bool doesConstraintExist(pair<int, int> constraint) {
-		for (int constraintId : constraintsPerVertex[constraint.first]) {
+	bool doesConstraintExist(ivec2 constraint) {
+		for (int constraintId : constraintsPerVertex[constraint.x]) {
 			if (vertexIds[constraintId] == constraint)	// if exists: skip adding
 				return true;
 		}
 		return false;
 	}
 
-	void addConstraint(pair<int, int> vertexIDs, float restValue) {
+	void addConstraint(ivec2 vertexIDs, float restValue) {
 		// sort pair
 		vertexIDs = sortVertexIds(vertexIDs);
 		// add data, if constraint does not exist yet
@@ -59,10 +59,10 @@ public:
 		vertexIds.push_back(vertexIDs);
 		restValues.push_back(restValue);
 		// setup vertex-constraint lookup & constraints per vertex
-		constraintCountPerVertex[vertexIDs.first]++;
-		constraintCountPerVertex[vertexIDs.second]++;
-		constraintsPerVertex[vertexIDs.first].push_back(constraintId);
-		constraintsPerVertex[vertexIDs.second].push_back(constraintId);
+		constraintCountPerVertex[vertexIDs.x]++;
+		constraintCountPerVertex[vertexIDs.y]++;
+		constraintsPerVertex[vertexIDs.x].push_back(constraintId);
+		constraintsPerVertex[vertexIDs.y].push_back(constraintId);
 	}
 	
 	// Returns flat array of the data of vertexIds.
@@ -70,8 +70,8 @@ public:
 		vector<int> flat;
 		flat.reserve(vertexIds.size()*2);
 		for (auto& v : vertexIds) {
-			flat.push_back(v.first);
-			flat.push_back(v.second);
+			flat.push_back(v.x);
+			flat.push_back(v.y);
 		}
 		return flat.data();
 	}
