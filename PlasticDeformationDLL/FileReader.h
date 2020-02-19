@@ -2,6 +2,7 @@
 #include <vector>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include "Logger.h"
 using namespace std;
 using namespace glm;
@@ -14,6 +15,8 @@ namespace fileReader {
 		SURF_TO_TET_VERT_MAP = 3,
 		TET_MESH_VERT = 4,
 		TET_MESH_TET = 5,
+		TET_MESH_SURF_VERT = 6,
+		TET_MESH_SURF_TRI = 7,
 	};
 
 	// Splits up a string into a list of tokens via a given delimiter.
@@ -48,7 +51,7 @@ namespace fileReader {
 	}
 
 	// Parses a given .mesh file into a list of tet mesh vertices and tet mesh tetrahedra.
-	void parseFile_obj_mesh(const string &fileName, vector<vec3> &tetMeshVerts, vector<ivec4> &tetMeshTets) {
+	void parseFile_obj_mesh(const string& fileName, vector<vec3>& tetMeshVerts, vector<ivec4>& tetMeshTets) {
 
 		logger::log("--parseFile_obj_mesh");
 		ifstream inputFileStream(fileName);
@@ -150,5 +153,34 @@ namespace fileReader {
 		}
 		logger::log("\t -file parsed .. s2t-map count: " + to_string(surfaceToTetMeshVertexMap.size()) + ", BC vert count: " + to_string(barycentricCoords.size()) + ", BC tet count: " + to_string(barycentricTetrahedronIds.size()));
 		//logger::log("\t -file parsed .. s2t-map count: " + to_string(surfaceToTetMeshVertexMap.size()));
+	}
+
+	void parseFile_obj_mesh__sf_mesh(const string& fileName, vector<vec3>& tetMeshSurfVerts, vector<ivec3>& tetMeshSurfTris) {
+		logger::log("-- parseFile_obj_mesh__sf_mesh");
+		
+		tetMeshSurfVerts.resize(0);
+		tetMeshSurfTris.resize(0);
+		
+		FileReadMode frm = NONE;
+		string line;
+		ifstream inputFileStream(fileName);
+		while (getline(inputFileStream, line)) {
+			// deterine read mode (vertex or face)
+			if ((frm == NONE || frm == TET_MESH_SURF_TRI) && startsWith(line, "v"))
+				frm = TET_MESH_SURF_VERT;
+			else if ((frm == NONE || frm == TET_MESH_SURF_VERT) && startsWith(line, "f"))
+				frm = TET_MESH_SURF_TRI;
+			// get info from line
+			vector<string> v{ splitString(line, ' ') };
+			if (frm == TET_MESH_SURF_VERT) {
+				tetMeshSurfVerts.push_back(vec3(stof(v[1]), stof(v[2]), stof(v[3])));
+				//logger::log("\t\t vert: "+to_string(tetMeshSurfVerts[tetMeshSurfVerts.size()-1]));
+			}
+			else if (frm == TET_MESH_SURF_TRI) {
+				tetMeshSurfTris.push_back(ivec3(stoi(v[1]) - 1, stoi(v[2]) - 1, stoi(v[3]) - 1));
+				//logger::log("\t\t tri: " + to_string(tetMeshSurfTris[tetMeshSurfTris.size() - 1]));
+			}
+		}		
+		logger::log("\t\t-parsing done. "+to_string(tetMeshSurfVerts.size())+" verts, "+to_string(tetMeshSurfTris.size())+" tris");
 	}
 }

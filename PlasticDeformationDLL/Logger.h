@@ -39,10 +39,14 @@ namespace logger {
 	}
 
 	void logError(const string &text) {
+		if (!isActive)
+			return;
 		log("--!ERROR!--" + text);
 	}
 
 	void setFilePath(string path) {
+		if (!isActive)
+			return;
 		logFilePath = path + getTime(false) + ".log";
 		log("--Setup Log");
 	}
