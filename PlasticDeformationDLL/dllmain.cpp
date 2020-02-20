@@ -13,7 +13,7 @@
 #include <tbb/blocked_range.h>
 
 #include "Logger.h"
-#include "AABox.h"
+#include "BoundingBoxes.h"
 #include "Intersection.h"
 #include "Misc.h"
 
@@ -50,6 +50,9 @@ VolumeConstraintData _volumeConstraintData;
 vector<vec3> _distanceDeltas;
 vector<vec3> _volumeDeltas;
 ColliderData _collData;
+
+vec3 _convexHullPos;
+vec3 _convexHullSize;
 
 string _projectPath;
 string _tetrahedralizationPath;
@@ -89,12 +92,24 @@ void teardown() {
 }
 
 #pragma region solver
+bool doesCollideWithConvexHull(const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
+	switch (colliderType) {
+	case -1: // default/unset
+		return false;
+	case 1: {//box
+		return intersect(AABB(colliderPos, colliderSize), OBB(_convexHullPos + _tetMeshPosition, _tetMeshRotation, _convexHullSize));
+	}
+	default:
+		return false;
+	}
+}
+
 bool doesCollide(const vec3& vertex, const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
 	switch (colliderType) {
 	case -1: // default/unset
 		return false;
 	case 1: {//box
-		AABox aabb = AABox(colliderPos, colliderSize);
+		AABB aabb = AABB(colliderPos, colliderSize);
 		return intersect(aabb, vertex);
 	}
 	default:
@@ -104,7 +119,7 @@ bool doesCollide(const vec3& vertex, const vec3& colliderPos, const vec3& collid
 
 // Projects a point that is inside a box onto the closest plane
 // TODO: Ootimize (pass aabox by const reference)
-vec3 projectOrthogonal(const vec3& vertex, const AABox& box) {
+vec3 projectOrthogonal(const vec3& vertex, const AABB& box) {
 	//find closest plane
 	vec3 diffToMax = abs(box.getMax() - vertex);
 	vec3 diffToMin = abs(box.getMin() - vertex);
@@ -130,7 +145,7 @@ vec3 projectOrthogonal(const vec3& vertex, const AABox& box) {
 vec3 projectOrthogonal(const vec3& vertex, const vec3& collPos, const vec3& collSize, const int collType) {
 	switch (collType) {
 	default:
-		AABox aabox = AABox(collPos, collSize);
+		AABB aabox = AABB(collPos, collSize);
 		return projectOrthogonal(vertex, aabox);
 	}
 }
@@ -231,6 +246,26 @@ void solveConstraints() {
 	solveVolumeConstraints();
 }
 
+void getCollisionResult() {
+	auto startTime = chrono::high_resolution_clock::now();
+
+	for (int colliderId = 0; colliderId < _collData.colliderCount; colliderId++) {
+		vec3 collPos = _collData.colliderPositions[colliderId];
+		vec3 collSize = _collData.colliderSizes[colliderId];
+		int collType = _collData.colliderTypes[colliderId];
+
+		for (int i = 0; i < _iterationCount; i++) {
+			if (doesCollideWithConvexHull(collPos, collSize, collType)) {
+				projectVertices(collPos, collSize, collType);
+				//solveConstraints();
+			}
+		}
+	}
+
+	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
+	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
+}
+
 void getCollisionResult(int colliderId) {
 	auto startTime = chrono::high_resolution_clock::now();
 
@@ -242,6 +277,7 @@ void getCollisionResult(int colliderId) {
 		projectVertices(collPos, collSize, collType);
 		solveConstraints();
 	}
+
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
 	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
@@ -350,6 +386,7 @@ void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
 		vertex.z = surfaceVertices[i * 3 + 2];
 		_surfaceVertices[i] = vertex;
 	});
+	logger::log("\t -_surfaceVertices.size() == " + to_string(_surfaceVertices.size()));
 }
 
 //TODO: old -> remove
@@ -522,7 +559,7 @@ extern "C" {
 		vector<int>().swap(result);
 	}
 	DLL_EXPORT int dll_getSurfaceVertexCount() {
-		return (int)_tetMeshSurfaceVertexToTetMeshVertexMap.size();
+		return (int)_surfaceVertices.size();
 	}
 	DLL_EXPORT void dll_getSurfaceVertices(int* output) {
 		// get vertex positions for barycentric mapping
@@ -639,7 +676,7 @@ extern "C" {
 		memcpy(rotationOutput, vectorFuncs::getVectorData(r), 3 * sizeof(float));
 	}
 	DLL_EXPORT bool dll_testVertexAABoxIntersection(float* vertex, float* cPos, float* cSize) {
-		return intersect(AABox(vec3(cPos[0], cPos[1], cPos[2]), vec3(cSize[0], cSize[1], cSize[2])), vec3(vertex[0], vertex[1], vertex[2]));
+		return intersect(AABB(vec3(cPos[0], cPos[1], cPos[2]), vec3(cSize[0], cSize[1], cSize[2])), vec3(vertex[0], vertex[1], vertex[2]));
 	}
 #pragma endregion tests
 }
