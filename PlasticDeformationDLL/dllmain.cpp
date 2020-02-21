@@ -257,7 +257,7 @@ void getCollisionResult() {
 		for (int i = 0; i < _iterationCount; i++) {
 			if (doesCollideWithConvexHull(collPos, collSize, collType)) {
 				projectVertices(collPos, collSize, collType);
-				//solveConstraints();
+				solveConstraints();
 			}
 		}
 	}
@@ -275,12 +275,13 @@ void getCollisionResult(int colliderId) {
 	
 	for (int i = 0; i < _iterationCount; i++) {
 		projectVertices(collPos, collSize, collType);
-		solveConstraints();
+		//solveConstraints();
 	}
 
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
 	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
+	logger::log("solver time: "+to_string(_solverDeltaTime));
 }
 #pragma endregion solver
 

@@ -149,7 +149,6 @@
     <ClInclude Include="BoundingBoxes.h" />
     <ClInclude Include="BarycentricMapping.h" />
     <ClInclude Include="ColliderData.h" />
-    <ClInclude Include="ConvexHull.h" />
     <ClInclude Include="DistanceConstraintData.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="FileWriter.h" />

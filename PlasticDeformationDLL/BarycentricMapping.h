@@ -376,26 +376,7 @@ namespace bcmapping {
 			indeces[i] = findIdOfSimilar(subSet[i], superSet, 0.01f);
 		});
 	}
-
-	// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
-	/*void updateSurfaceVertices(
-		vector<vec3>& inputVertices,
-		const vector<vec3>& tetMeshVertices,
-		const vector<ivec4> &tetVertexIds,
-		const vector<vec4>& barycentricCoords,
-		const vector<int>& barycentricTetIds) {
-
-		parallel_for((size_t)0, (size_t)inputVertices.size(), (size_t)1, [&](size_t vertex) {
-			// get positions of related verts
-			ivec4 tetMeshVertexId = tetVertexIds[barycentricTetIds[vertex]];
-			vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
-			vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
-			vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
-			vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
-			inputVertices[vertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[vertex]);
-		});
-	}*/
-
+	
 	// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
 	void updateSurfaceVerticesWithMapping(
 		vector<vec3>& surfaceVertices,
@@ -405,8 +386,7 @@ namespace bcmapping {
 		const vector<vec4>& barycentricCoords,
 		const vector<int>& barycentricTetIds) {
 
-		logger::log("--updateSurfaceVerticesWithMapping");
-
+		//logger::log("--updateSurfaceVerticesWithMapping");
 		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t surfVertex) {
 			if (surfaceToTetMeshVertexMap[surfVertex] != -1) {
 				surfaceVertices[surfVertex] = tetMeshVertices[surfaceToTetMeshVertexMap[surfVertex]];
@@ -421,6 +401,5 @@ namespace bcmapping {
 				surfaceVertices[surfVertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[surfVertex]);
 			}
 		});
-		//logger::log("\t-done");
 	}
 }
