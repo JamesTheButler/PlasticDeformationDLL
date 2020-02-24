@@ -17,8 +17,7 @@
 #include "Intersection.h"
 #include "Misc.h"
 
-#include "DistanceConstraintData.h"
-#include "VolumeConstraintData.h"
+#include "Constraints.h"
 #include "ColliderData.h"
 #include "BarycentricMapping.h"
 #include "FileReader.h"
@@ -45,14 +44,11 @@ vector<int> _tetMeshSurfaceVertexToTetMeshVertexMap; // mapping of surface verti
 vector<vec4> _barycentricCoordinates;	// barycentric coordinates (relating vertices of the surface mesh to vertices of tet mesh
 vector<int> _barycentricTetIds;			// tetrahedron each vertex is mapped to
 
-DistanceConstraintData _distanceConstraintData;
-VolumeConstraintData _volumeConstraintData;
+Constraints::DistanceConstraintData _distanceConstraintData;
+Constraints::VolumeConstraintData _volumeConstraintData;
 vector<vec3> _distanceDeltas;
 vector<vec3> _volumeDeltas;
 ColliderData _collData;
-
-vec3 _convexHullPos;
-vec3 _convexHullSize;
 
 string _projectPath;
 string _tetrahedralizationPath;
@@ -74,8 +70,8 @@ void teardown() {
 	_tetMeshPosition = vec3();
 	_tetMeshRotation = vec3();
 	_collData = ColliderData();
-	_distanceConstraintData = DistanceConstraintData();
-	_volumeConstraintData = VolumeConstraintData();
+	_distanceConstraintData = Constraints::DistanceConstraintData();
+	_volumeConstraintData = Constraints::VolumeConstraintData();
 	_collidingVertexCount = 0;
 
 	vector<vec3>().swap(_tetMeshVertices);
@@ -92,7 +88,8 @@ void teardown() {
 }
 
 #pragma region solver
-bool doesCollideWithConvexHull(const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
+//TODO: remove (not necessary anymore)
+/*bool doesCollideWithConvexHull(const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
 	switch (colliderType) {
 	case -1: // default/unset
 		return false;
@@ -102,7 +99,7 @@ bool doesCollideWithConvexHull(const vec3& colliderPos, const vec3& colliderSize
 	default:
 		return false;
 	}
-}
+}*/
 
 bool doesCollide(const vec3& vertex, const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
 	switch (colliderType) {
@@ -218,8 +215,7 @@ void solveVolumeConstraints() {
 
 void solveDistanceConstraints() {
 	// clear deltas
-	//TODO: _distanceDeltas.resize(_tetMeshVetices.size(), vec3(000));
-	vector<vec3>(_tetMeshVertices.size(), vec3(0, 0, 0)).swap(_distanceDeltas);
+	vector<vec3>(_tetMeshVertices.size()).swap(_distanceDeltas);
 	//calc deltas
 	parallel_for((size_t)0, _distanceConstraintData.constraintCount - 1, (size_t)1, [=](size_t i) {
 		int id1 = _distanceConstraintData.vertexIds[i].x;
@@ -231,7 +227,7 @@ void solveDistanceConstraints() {
 	});
 	// apply deltas
 	parallel_for((size_t)0, (size_t)(_tetMeshVertices.size() - 1), (size_t)1, [=](size_t i) {
-		_tetMeshVertices[i] += _distanceDeltas[i] / (float)_distanceConstraintData.constraintCountPerVertex[i];
+		_tetMeshVertices[i] += (vec3)(_distanceDeltas[i] / (float)_distanceConstraintData.constraintCountPerVertex[i]);
 	});
 	// update rest values
 	parallel_for((size_t)0, _distanceConstraintData.constraintCount - 1, (size_t)1, [=](size_t i) {
@@ -246,7 +242,7 @@ void solveConstraints() {
 	solveVolumeConstraints();
 }
 
-void getCollisionResult() {
+/*void getCollisionResult() {
 	auto startTime = chrono::high_resolution_clock::now();
 
 	for (int colliderId = 0; colliderId < _collData.colliderCount; colliderId++) {
@@ -264,7 +260,7 @@ void getCollisionResult() {
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
 	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
-}
+}*/
 
 void getCollisionResult(int colliderId) {
 	auto startTime = chrono::high_resolution_clock::now();
@@ -277,7 +273,6 @@ void getCollisionResult(int colliderId) {
 		projectVertices(collPos, collSize, collType);
 		//solveConstraints();
 	}
-
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
 	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
@@ -321,11 +316,11 @@ void setPlasticity(float plasticity) {
 }
 
 //TODO: parallelize
-void generateConstraints(
+/*void generateConstraints(
 	const vector<vec3> &vertices,
 	const vector<ivec4> &tetrahedra, 
-	DistanceConstraintData &distanceConstraintData, 
-	VolumeConstraintData &volumeConstraintData) {
+	Constraints::DistanceConstraintData &distanceConstraintData, 
+	Constraints::VolumeConstraintData &volumeConstraintData) {
 
 	logger::log("--generateConstraints");
 	int vertexCount = vertices.size();
@@ -374,6 +369,7 @@ void generateConstraints(
 	
 	logger::log("\t-D-constraints:" + to_string(_distanceConstraintData.constraintCount) + ",\t V-constraints: " + to_string(_volumeConstraintData.constraintCount));
 }
+*/
 
 void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
 	logger::log("--setSurfaceVertices");
@@ -442,7 +438,7 @@ bool init() {
 	fileReader::parseFile_obj_mesh__sf_mesh(tetMeshSurfaceFilePath, _tetMeshSurfaceVertices, _tetMeshSurfaceTriangles);
 	vectorFuncs::indexSubsetVertices(_tetMeshSurfaceVertices, _tetMeshVertices, _tetMeshSurfaceVertexToTetMeshVertexMap);
 	//generate constraints
-	generateConstraints(
+	Constraints::generateConstraints(
 		_tetMeshVertices,
 		_tetMeshTetrahedra,
 		_distanceConstraintData,

@@ -99,7 +99,7 @@
       <AdditionalDependencies>tbb.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>call "$(SolutionDir)postbuild.bat"</Command>
+      <Command>call "$(SolutionDir)postbuild_d.bat"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>call "$(SolutionDir)prebuild.bat"</Command>
@@ -139,7 +139,7 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>call "$(SolutionDir)postbuild.bat"</Command>
+      <Command>call "$(SolutionDir)postbuild_r.bat"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -149,6 +149,7 @@
     <ClInclude Include="BoundingBoxes.h" />
     <ClInclude Include="BarycentricMapping.h" />
     <ClInclude Include="ColliderData.h" />
+    <ClInclude Include="Constraints.h" />
     <ClInclude Include="DistanceConstraintData.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="FileWriter.h" />
