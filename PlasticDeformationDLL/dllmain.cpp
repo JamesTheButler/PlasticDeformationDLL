@@ -44,8 +44,8 @@ vector<int> _tetMeshSurfaceVertexToTetMeshVertexMap; // mapping of surface verti
 vector<vec4> _barycentricCoordinates;	// barycentric coordinates (relating vertices of the surface mesh to vertices of tet mesh
 vector<int> _barycentricTetIds;			// tetrahedron each vertex is mapped to
 
-Constraints::DistanceConstraintData _distanceConstraintData;
-Constraints::VolumeConstraintData _volumeConstraintData;
+Constraints::DistanceConstraintData _distanceConstraints;
+Constraints::VolumeConstraintData _volumeConstraints;
 vector<vec3> _distanceDeltas;
 vector<vec3> _volumeDeltas;
 ColliderData _collData;
@@ -64,14 +64,12 @@ float _plasticityFactor = 0.0f;
 int _debugInt = 0;
 float _debugFloat = 0.0f;
 
-// TODO: clean up correctly 
-// TODO: optimize (pass-by-reference, const (if unchanged))
 void teardown() {
 	_tetMeshPosition = vec3();
 	_tetMeshRotation = vec3();
 	_collData = ColliderData();
-	_distanceConstraintData = Constraints::DistanceConstraintData();
-	_volumeConstraintData = Constraints::VolumeConstraintData();
+	_distanceConstraints = Constraints::DistanceConstraintData();
+	_volumeConstraints = Constraints::VolumeConstraintData();
 	_collidingVertexCount = 0;
 
 	vector<vec3>().swap(_tetMeshVertices);
@@ -88,19 +86,6 @@ void teardown() {
 }
 
 #pragma region solver
-//TODO: remove (not necessary anymore)
-/*bool doesCollideWithConvexHull(const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
-	switch (colliderType) {
-	case -1: // default/unset
-		return false;
-	case 1: {//box
-		return intersect(AABB(colliderPos, colliderSize), OBB(_convexHullPos + _tetMeshPosition, _tetMeshRotation, _convexHullSize));
-	}
-	default:
-		return false;
-	}
-}*/
-
 bool doesCollide(const vec3& vertex, const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
 	switch (colliderType) {
 	case -1: // default/unset
@@ -115,7 +100,6 @@ bool doesCollide(const vec3& vertex, const vec3& colliderPos, const vec3& collid
 }
 
 // Projects a point that is inside a box onto the closest plane
-// TODO: Ootimize (pass aabox by const reference)
 vec3 projectOrthogonal(const vec3& vertex, const AABB& box) {
 	//find closest plane
 	vec3 diffToMax = abs(box.getMax() - vertex);
@@ -160,20 +144,60 @@ void projectVertices(const vec3& collPos, const vec3& collSize, const int collTy
 	});
 }
 
-void solveVolumeConstraints() {
+void solveVolumeConstraintsGaussSeidel() {
+	for (int i = 0; i < _volumeConstraints.constraintCount; i++) {
+		vec3 verts[4];
+		ivec4 vertIds = _volumeConstraints.vertexIds[i];
+		verts[0] = _tetMeshVertices[vertIds.x];
+		verts[1] = _tetMeshVertices[vertIds.y];
+		verts[2] = _tetMeshVertices[vertIds.z];
+		verts[3] = _tetMeshVertices[vertIds.w];
+		// determine delta
+		float volumeDifference = _volumeConstraints.restValues[i] - geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]);
+		// determine displacement vectors per vertex (normals of opposing faces)
+		vec3 p0p1 = verts[1] - verts[0];
+		vec3 p0p2 = verts[2] - verts[0];
+		vec3 p0p3 = verts[3] - verts[0];
+		vec3 grad[4];
+		grad[1] = cross(p0p2, p0p3) / 6.f;
+		grad[2] = cross(p0p3, p0p1) / 6.f;
+		grad[3] = cross(p0p1, p0p2) / 6.f;
+		grad[0] = (grad[1] + grad[2] + grad[3]) * -1.f;
+		// determine deltas
+		// denominator of the scaling factor
+		float sum_squared_grad_p = dot(grad[0], grad[0]) + dot(grad[1], grad[1]) + dot(grad[2], grad[2]) + dot(grad[3], grad[3]);
+
+		float displacement = 0;
+		if (sum_squared_grad_p > 0.00001f) {
+			displacement = volumeDifference / sum_squared_grad_p;
+		}
+		else {
+			displacement = 0;
+		}
+		//update vertices
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].x] += grad[0] * displacement;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].y] += grad[1] * displacement;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement;
+		//update rest values
+		_volumeConstraints.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraints.restValues[i], _plasticityFactor);
+	}
+}
+
+void solveVolumeConstraintsJacobi() {
 	//clear deltas
 	vector<vec3>(_tetMeshVertices.size(), vec3(0, 0, 0)).swap(_volumeDeltas);
 	//calc deltas
-	parallel_for((size_t)0, _volumeConstraintData.constraintCount - 1, (size_t)1, [=](size_t i) {
+	parallel_for((size_t)0, _volumeConstraints.constraintCount - 1, (size_t)1, [=](size_t i) {
 		// get actual vertices
 		vec3 verts[4];
-		ivec4 vertIds = _volumeConstraintData.vertexIds[i];
+		ivec4 vertIds = _volumeConstraints.vertexIds[i];
 		verts[0] = _tetMeshVertices[vertIds.x];
 		verts[1] = _tetMeshVertices[vertIds.y];
 		verts[2] = _tetMeshVertices[vertIds.z]; 
 		verts[3] = _tetMeshVertices[vertIds.w];
 
-		float volumeDifference = _volumeConstraintData.restValues[i] - geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]);
+		float volumeDifference = _volumeConstraints.restValues[i] - geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]);
 		// determine displacement vectors per vertex (normals of opposing faces)
 		vec3 p0p1 = verts[1] - verts[0];
 		vec3 p0p2 = verts[2] - verts[0];
@@ -193,74 +217,68 @@ void solveVolumeConstraints() {
 		} else {
 			displacement = 0;
 		}
-		_volumeDeltas[_volumeConstraintData.vertexIds[i].x] += grad[0] * displacement;
-		_volumeDeltas[_volumeConstraintData.vertexIds[i].y] += grad[1] * displacement;
-		_volumeDeltas[_volumeConstraintData.vertexIds[i].z] += grad[2] * displacement;
-		_volumeDeltas[_volumeConstraintData.vertexIds[i].w] += grad[3] * displacement;
+		_volumeDeltas[_volumeConstraints.vertexIds[i].x] += grad[0] * displacement;
+		_volumeDeltas[_volumeConstraints.vertexIds[i].y] += grad[1] * displacement;
+		_volumeDeltas[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement;
+		_volumeDeltas[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement;
 	});
 	// apply deltas
 	parallel_for((size_t)0, (size_t)(_tetMeshVertices.size() - 1), (size_t)1, [=](size_t i) {
-		_tetMeshVertices[i] += _volumeDeltas[i] / (float)_volumeConstraintData.constraintsPerVertex[i];
+		_tetMeshVertices[i] += _volumeDeltas[i] / (float)_volumeConstraints.constraintsPerVertex[i];
 	});
 	// update rest values
-	parallel_for((size_t)0, _volumeConstraintData.constraintCount - 1, (size_t)1, [=](size_t i) {
+	parallel_for((size_t)0, _volumeConstraints.constraintCount - 1, (size_t)1, [=](size_t i) {
 		vec3 verts[4];
-		verts[0] = _tetMeshVertices[_volumeConstraintData.vertexIds[i].x];
-		verts[1] = _tetMeshVertices[_volumeConstraintData.vertexIds[i].y];
-		verts[2] = _tetMeshVertices[_volumeConstraintData.vertexIds[i].z];
-		verts[3] = _tetMeshVertices[_volumeConstraintData.vertexIds[i].w];
-		_volumeConstraintData.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraintData.restValues[i], _plasticityFactor);
+		verts[0] = _tetMeshVertices[_volumeConstraints.vertexIds[i].x];
+		verts[1] = _tetMeshVertices[_volumeConstraints.vertexIds[i].y];
+		verts[2] = _tetMeshVertices[_volumeConstraints.vertexIds[i].z];
+		verts[3] = _tetMeshVertices[_volumeConstraints.vertexIds[i].w];
+		_volumeConstraints.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraints.restValues[i], _plasticityFactor);
 	});
 }
 
-void solveDistanceConstraints() {
+// Gauss Seidel implementation of the distance constraint solver
+void solveDistanceConstraintsGaussSeidel() {
+	for (int i = 0; i < _distanceConstraints.constraintCount; i++) {
+		int id1 = _distanceConstraints.vertexIds[i].x;
+		int id2 = _distanceConstraints.vertexIds[i].y;
+		float currentDistance = distance(_tetMeshVertices[id1], _tetMeshVertices[id2]);
+		vec3 delta = normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
+		_tetMeshVertices[id1] += delta;
+		_tetMeshVertices[id2] -= delta;
+		_distanceConstraints.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraints.restValues[i], _plasticityFactor);
+	}
+}
+
+// Jacobi implementation of the distance constraint solver
+void solveDistanceConstraintsJacobi() {
 	// clear deltas
 	vector<vec3>(_tetMeshVertices.size()).swap(_distanceDeltas);
 	//calc deltas
-	parallel_for((size_t)0, _distanceConstraintData.constraintCount - 1, (size_t)1, [=](size_t i) {
-		int id1 = _distanceConstraintData.vertexIds[i].x;
-		int id2 = _distanceConstraintData.vertexIds[i].y;
+	parallel_for((size_t)0, _distanceConstraints.constraintCount - 1, (size_t)1, [=](size_t i) {
+		int id1 = _distanceConstraints.vertexIds[i].x;
+		int id2 = _distanceConstraints.vertexIds[i].y;
 		float currentDistance = distance(_tetMeshVertices[id1], _tetMeshVertices[id2]);
-		vec3 delta = ((_tetMeshVertices[id1] - _tetMeshVertices[id2]) / currentDistance) * (_distanceConstraintData.restValues[i] - currentDistance) / 4.0f;
+		vec3 delta = normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (currentDistance - _distanceConstraints.restValues[i]) / 2.0f;
 		_distanceDeltas[id1] += -delta;
 		_distanceDeltas[id2] += +delta;
 	});
 	// apply deltas
 	parallel_for((size_t)0, (size_t)(_tetMeshVertices.size() - 1), (size_t)1, [=](size_t i) {
-		_tetMeshVertices[i] += (vec3)(_distanceDeltas[i] / (float)_distanceConstraintData.constraintCountPerVertex[i]);
+		_tetMeshVertices[i] += (vec3)(_distanceDeltas[i] / (float)_distanceConstraints.constraintCountPerVertex[i]);
 	});
 	// update rest values
-	parallel_for((size_t)0, _distanceConstraintData.constraintCount - 1, (size_t)1, [=](size_t i) {
-		int id1 = _distanceConstraintData.vertexIds[i].x;
-		int id2 = _distanceConstraintData.vertexIds[i].y;
-		_distanceConstraintData.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraintData.restValues[i], _plasticityFactor);
+	parallel_for((size_t)0, _distanceConstraints.constraintCount - 1, (size_t)1, [=](size_t i) {
+		int id1 = _distanceConstraints.vertexIds[i].x;
+		int id2 = _distanceConstraints.vertexIds[i].y;
+		_distanceConstraints.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraints.restValues[i], _plasticityFactor);
 	});
 }
 
 void solveConstraints() {
-	solveDistanceConstraints();
-	solveVolumeConstraints();
+	solveDistanceConstraintsJacobi();
+	solveVolumeConstraintsGaussSeidel();
 }
-
-/*void getCollisionResult() {
-	auto startTime = chrono::high_resolution_clock::now();
-
-	for (int colliderId = 0; colliderId < _collData.colliderCount; colliderId++) {
-		vec3 collPos = _collData.colliderPositions[colliderId];
-		vec3 collSize = _collData.colliderSizes[colliderId];
-		int collType = _collData.colliderTypes[colliderId];
-
-		for (int i = 0; i < _iterationCount; i++) {
-			if (doesCollideWithConvexHull(collPos, collSize, collType)) {
-				projectVertices(collPos, collSize, collType);
-				solveConstraints();
-			}
-		}
-	}
-
-	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
-	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
-}*/
 
 void getCollisionResult(int colliderId) {
 	auto startTime = chrono::high_resolution_clock::now();
@@ -315,62 +333,6 @@ void setPlasticity(float plasticity) {
 	logger::log("--setPlasticity to " + to_string(plasticity));
 }
 
-//TODO: parallelize
-/*void generateConstraints(
-	const vector<vec3> &vertices,
-	const vector<ivec4> &tetrahedra, 
-	Constraints::DistanceConstraintData &distanceConstraintData, 
-	Constraints::VolumeConstraintData &volumeConstraintData) {
-
-	logger::log("--generateConstraints");
-	int vertexCount = vertices.size();
-	// set up vertex-to-constrain look up
-	distanceConstraintData.constraintCountPerVertex.resize(vertexCount, 0);
-	distanceConstraintData.constraintsPerVertex.resize(vertexCount, vector<int>(0));
-	volumeConstraintData.constraintsPerVertex.resize(vertexCount, 0);
-
-	// generate constraints
-	size_t tetCount = tetrahedra.size();
-	distanceConstraintData.vertexIds.reserve(tetCount * 6);
-	distanceConstraintData.restValues.reserve(tetCount * 6);
-	volumeConstraintData.vertexIds.reserve(tetCount);
-	volumeConstraintData.restValues.reserve(tetCount);
-	volumeConstraintData.constraintCount = tetCount;
-	vec3 vertex[4];
-	int tetVertexIDs[4];
-	//for each tetrahdedron
-	//parallel_for((size_t)0, tetCount, (size_t)1, [&](size_t &tetId) {
-	for (int tetId = 0; tetId < tetCount; tetId++) {
-		//get 4 vertices and their ids
-		ivec4 tet = tetrahedra[tetId];
-		vertex[0] = vertices[tet[0]];
-		vertex[1] = vertices[tet[1]];
-		vertex[2] = vertices[tet[2]];
-		vertex[3] = vertices[tet[3]];
-		tetVertexIDs[0] = tet[0];
-		tetVertexIDs[1] = tet[1];
-		tetVertexIDs[2] = tet[2];
-		tetVertexIDs[3] = tet[3];		
-		// generate distance constraints along each tetrahedron edge
-		distanceConstraintData.addConstraint(ivec2(tetVertexIDs[0], tetVertexIDs[1]), distance(vertex[0], vertex[1]));
-		distanceConstraintData.addConstraint(ivec2(tetVertexIDs[0], tetVertexIDs[2]), distance(vertex[0], vertex[2]));
-		distanceConstraintData.addConstraint(ivec2(tetVertexIDs[0], tetVertexIDs[3]), distance(vertex[0], vertex[3]));
-		distanceConstraintData.addConstraint(ivec2(tetVertexIDs[1], tetVertexIDs[2]), distance(vertex[1], vertex[2]));
-		distanceConstraintData.addConstraint(ivec2(tetVertexIDs[1], tetVertexIDs[3]), distance(vertex[1], vertex[3]));
-		distanceConstraintData.addConstraint(ivec2(tetVertexIDs[2], tetVertexIDs[3]), distance(vertex[2], vertex[3]));
-		// generate volume constraint per tetrahedron
-		volumeConstraintData.addConstraint(ivec4(tetVertexIDs[0], tetVertexIDs[1], tetVertexIDs[2], tetVertexIDs[3]),
-			geometry::getTetrahedronVolume(vertex[0], vertex[1], vertex[2], vertex[3]));
-	}//);
-	// resize data constrainers and set constraint count
-	distanceConstraintData.vertexIds.resize(distanceConstraintData.vertexIds.size());
-	distanceConstraintData.restValues.resize(distanceConstraintData.vertexIds.size());
-	distanceConstraintData.constraintCount = distanceConstraintData.vertexIds.size();
-	
-	logger::log("\t-D-constraints:" + to_string(_distanceConstraintData.constraintCount) + ",\t V-constraints: " + to_string(_volumeConstraintData.constraintCount));
-}
-*/
-
 void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
 	logger::log("--setSurfaceVertices");
 	logger::log("\t -surface verts:" + to_string(surfaceVertCount));
@@ -385,36 +347,6 @@ void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
 	});
 	logger::log("\t -_surfaceVertices.size() == " + to_string(_surfaceVertices.size()));
 }
-
-//TODO: old -> remove
-/* void setTetMeshData(
-	float* vertices,
-	int vertexCount,
-	int* tetrahedra,
-	int tetCount) {
-
-	logger::log("--setTetMeshData ");
-	logger::log("\t -verts:"+to_string(vertexCount)+", \t tets:" +to_string(tetCount));
-	// vertices
-	_vertices.resize(vertexCount, vec3(0,0,0));
-	parallel_for((size_t)0, (size_t)vertexCount, (size_t)1, [&](size_t i) {
-		vec3 temporaryVertex;
-		temporaryVertex.x = vertices[i * 3];
-		temporaryVertex.y = vertices[i * 3 + 1];
-		temporaryVertex.z = vertices[i * 3 + 2];
-		_vertices[i] = temporaryVertex;
-	});
-	// tetrahedra
-	_tetrahedra.resize(tetCount, ivec4());
-	parallel_for((size_t)0, (size_t)tetCount, (size_t)1, [&](size_t i) {
-		ivec4 tet;
-		tet[0] = tetrahedra[i * 4];
-		tet[1] = tetrahedra[i * 4 + 1];
-		tet[2] = tetrahedra[i * 4 + 2];
-		tet[3] = tetrahedra[i * 4 + 3];
-		_tetrahedra[i] = tet;
-	});
-}*/
 
 bool init() {
 	logger::log("--init");
@@ -441,8 +373,8 @@ bool init() {
 	Constraints::generateConstraints(
 		_tetMeshVertices,
 		_tetMeshTetrahedra,
-		_distanceConstraintData,
-		_volumeConstraintData);
+		_distanceConstraints,
+		_volumeConstraints);
 	_distanceDeltas.resize(_tetMeshVertices.size(), vec3());
 	_volumeDeltas.resize(_tetMeshVertices.size(), vec3());
 	logger::log("\t-constraints generated.. ");
@@ -469,7 +401,6 @@ bool init() {
 			_surfaceVertexToTetVertexMap,
 			_barycentricCoordinates,
 			_barycentricTetIds);
-		//fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
 		fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertices, _tetMeshVertices, _tetMeshTetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
 		logger::log("\t\t" + surfaceFilePath + " generated");
 	}
@@ -491,10 +422,6 @@ extern "C" {
 	DLL_EXPORT void dll_setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) 		{
 		setSurfaceVertices(surfaceVertices, surfaceVertCount);
 	}
-	//TODO: old -> remove
-	/*DLL_EXPORT void dll_setTetMeshData(float* vertices, int vertexCount, int* tetrahedra, int tetCount) {
-		setTetMeshData(vertices, vertexCount, tetrahedra, tetCount);
-	}*/
 	DLL_EXPORT void dll_setColliders(float* colliderPositions, float* colliderSizes, int* colliderTypes, int colliderCount) {
 		setColliders(colliderPositions, colliderSizes, colliderTypes, colliderCount);
 	}
@@ -502,11 +429,9 @@ extern "C" {
 		setTetMeshTransforms(translation, rotation);
 	}
 	DLL_EXPORT void dll_setFileName(const char* name, int charCount) {
-		//_fileName = name;
 		_fileName = vectorFuncs::charPtrToString(name, charCount);
 	}
 	DLL_EXPORT void dll_setFilePath(const char* path, int charCount) {
-		//_filePath = path;
 		_projectPath = vectorFuncs::charPtrToString(path, charCount);
 		_tetrahedralizationPath = _projectPath + "Tetrahedralization/";
 		_logPath = _projectPath + "Logs/";
@@ -599,13 +524,13 @@ extern "C" {
 		memcpy(typeOutput, _collData.colliderTypes.data(), _collData.colliderTypes.size() * sizeof(int));
 	}
 	DLL_EXPORT int dll_getDistanceConstraintCount() {
-		return (int)_distanceConstraintData.constraintCount;
+		return (int)_distanceConstraints.constraintCount;
 	}
 	DLL_EXPORT int dll_getVolumeConstraintCount() {
-		return (int)_volumeConstraintData.constraintCount;
+		return (int)_volumeConstraints.constraintCount;
 	}
 	DLL_EXPORT void dll_getConstraintRestValues(int* output) {
-		memcpy(output, _distanceConstraintData.restValues.data(), (int)_distanceConstraintData.restValues.size() * sizeof(int));
+		memcpy(output, _distanceConstraints.restValues.data(), (int)_distanceConstraints.restValues.size() * sizeof(int));
 	}
 	DLL_EXPORT int dll_getCollisionCount() {
 		return _collidingVertexCount;
@@ -638,10 +563,10 @@ extern "C" {
 		solveConstraints();
 	}
 	DLL_EXPORT void dll_solveDistanceConstraints() {
-		solveDistanceConstraints();
+		solveDistanceConstraintsJacobi();
 	}
 	DLL_EXPORT void dll_solveVolumeConstraints() {
-		solveVolumeConstraints();
+		solveVolumeConstraintsGaussSeidel();
 	}
 #pragma endregion Calculations
 #pragma region setup/setdown
