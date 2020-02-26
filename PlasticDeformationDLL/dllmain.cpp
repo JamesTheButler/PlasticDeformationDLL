@@ -369,18 +369,15 @@ bool init() {
 	}
 	fileReader::parseFile_obj_mesh__sf_mesh(tetMeshSurfaceFilePath, _tetMeshSurfaceVertices, _tetMeshSurfaceTriangles);
 	vectorFuncs::indexSubsetVertices(_tetMeshSurfaceVertices, _tetMeshVertices, _tetMeshSurfaceVertexToTetMeshVertexMap);
-	//generate constraints
-	Constraints::generateConstraints(
-		_tetMeshVertices,
-		_tetMeshTetrahedra,
-		_distanceConstraints,
-		_volumeConstraints);
+	// generate constraints
+	Constraints::generateConstraints(_tetMeshVertices, _tetMeshTetrahedra, _distanceConstraints, _volumeConstraints);
+	// set size of delta values for constraints
 	_distanceDeltas.resize(_tetMeshVertices.size(), vec3());
 	_volumeDeltas.resize(_tetMeshVertices.size(), vec3());
 	logger::log("\t-constraints generated.. ");
 	logger::log("\t-parsing surface mesh data file");
 	// Read / generate surface data file
-	if (fileReader::fileExists(surfaceFilePath)) {		// read surface mapping file
+	/*if (fileReader::fileExists(surfaceFilePath)) {		// read surface mapping file
 		logger::log("\t\t surface data file exists parsed");
 		fileReader::parseFile_tetmesh(
 			surfaceFilePath,
@@ -390,7 +387,7 @@ bool init() {
 		logger::log("\t\t" + surfaceFilePath + " parsed");
 	}
 	else {
-		logger::log("\t\t" + surfaceFilePath + " does not exist");
+		//logger::log("\t\t" + surfaceFilePath + " does not exist");
 		// find tetmesh vertices that map directly to surface vertices
 		vectorFuncs::indexSubsetVertices(_surfaceVertices, _tetMeshVertices, _surfaceVertexToTetVertexMap);
 		// generate barycentric mapping for other surfaceVertices
@@ -403,7 +400,21 @@ bool init() {
 			_barycentricTetIds);
 		fileWriter::writeTetMeshDataToFile(surfaceFilePath, _surfaceVertices, _tetMeshVertices, _tetMeshTetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
 		logger::log("\t\t" + surfaceFilePath + " generated");
-	}
+	}*/
+	logger::log("Barycentric Mapping...");
+	bcmapping::findBarycentricTetIds(
+		_surfaceVertices,
+		_tetMeshVertices,
+		_tetMeshTetrahedra,
+		_barycentricTetIds
+	);
+	bcmapping::generateBarycentricMapping(
+		_surfaceVertices,
+		_tetMeshVertices,
+		_tetMeshTetrahedra,
+		_barycentricCoordinates,
+		_barycentricTetIds
+	);
 	logger::log("-- init done");
 	return true;
 }
@@ -487,7 +498,21 @@ extern "C" {
 		// get vertex positions for barycentric mapping
 		vector<vec3> newSurfVerts;
 		newSurfVerts.resize(_surfaceVertices.size());
-		bcmapping::updateSurfaceVerticesWithMapping(newSurfVerts, _tetMeshVertices, _tetMeshTetrahedra,_surfaceVertexToTetVertexMap, _barycentricCoordinates, _barycentricTetIds);
+		/*bcmapping::updateSurfaceVertices_m(
+			newSurfVerts, 
+			_tetMeshVertices,
+			_tetMeshTetrahedra,
+			_surfaceVertexToTetVertexMap, 
+			_barycentricCoordinates,
+			_barycentricTetIds
+		);*/
+		bcmapping::updateSurfaceVertices(
+			newSurfVerts,
+			_tetMeshVertices,
+			_tetMeshTetrahedra,
+			_barycentricCoordinates,
+			_barycentricTetIds
+		);
 		
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);

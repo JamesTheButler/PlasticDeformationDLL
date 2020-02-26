@@ -50,8 +50,7 @@ namespace bcmapping {
 				if ((determinant_p0 < 0) && (determinant_p1 < 0) && (determinant_p2 < 0) && (determinant_p3 < 0)) {
 					return true;
 				}
-			}
-			if (determinantTet > 0) {
+			} else if (determinantTet > 0) {
 				if ((determinant_p0 > 0) && (determinant_p1 > 0) && (determinant_p2 > 0) && (determinant_p3 > 0)) {
 					return true;
 				}
@@ -68,94 +67,132 @@ namespace bcmapping {
 	float getVertexDistanceToTetrahedronCenter(const vec3& v0, const vec3& v1, const vec3& v2, const vec3& v3, const vec3& vertex) {
 		return glm::length(getCenterOfTetrahedron(v0, v1, v2, v3) - vertex);
 	}
+	
+	// For each vertex, finds a tetrahedron that contains the vertex or (if that does not exist) the closest tetrahedron
+	void findBarycentricTetIds(
+		const vector<vec3>& inputVertices,
+		const vector<vec3>& tetMeshVertices,
+		const vector<ivec4>& tetMeshTetrahedra,
+		vector<int>& barycentricTetrahedronIds) {
 
-	// Finds closest tetrahedra to each input vertex.
-	void findClosestTetrahedra(
+		barycentricTetrahedronIds.resize(inputVertices.size(), -1);
+		
+		for (int vertex = 0; vertex < inputVertices.size(); vertex++) {		//for each input vertex
+			float minDistance = FLT_MAX;
+			// check for surface vertex-tet mesh vertex mapping
+			for (int tet = 0; tet < tetMeshTetrahedra.size(); tet++) {// for each tetrahedron
+				ivec4 tetMeshVertexId = tetMeshTetrahedra[tet];
+				vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+				vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+				vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+				vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+				// check if vert is in tetrahedron, else remember closest tetrahedron
+				if (bcmapping::isVertexInsideTetrahedron(v0, v1, v2, v3, inputVertices[vertex])) {
+					barycentricTetrahedronIds[vertex] = tet;
+					break;
+				} else {
+					float distance = getVertexDistanceToTetrahedronCenter(v0, v1, v2, v3, inputVertices[vertex]);
+					if (distance < minDistance) {
+						minDistance = distance;
+						barycentricTetrahedronIds[vertex] = tet;
+					}
+				}
+			}
+		}
+	}
+
+	void findBarycentricTetIds_m(
 		const vector<vec3>& inputVertices,
 		const vector<vec3>& tetMeshVertices,
 		const vector<ivec4>& tetMeshTetrahedra,
 		const vector<int>& surfaceToTetMeshVertexMap,
-		vector<int>& insideFlags,
-		vector<int>& closestTets,
-		vector<float>& minDistances) {
+		vector<int>& barycentricTetrahedronIds) {
 
-		float minDistance;
+		barycentricTetrahedronIds.resize(inputVertices.size(), -1);
 
-		parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {		//for each input vertex
-			minDistance = FLT_MAX;
+		for(int vertex=0; vertex < inputVertices.size(); vertex++) {		//for each input vertex
+			float minDistance = FLT_MAX;
 			// check for surface vertex-tet mesh vertex mapping
-			if (surfaceToTetMeshVertexMap[vertex] != -1) {
-				closestTets[vertex] = -1;
-				minDistances[vertex] = -1;
-				insideFlags[vertex] = -1;
-			} else {		//if surface vertex is NOT mapped to tet mesh vetex
-				parallel_for((size_t)0, tetMeshTetrahedra.size(), (size_t)1, [&](size_t tet) {// for each tetrahedron
+			if (surfaceToTetMeshVertexMap[vertex] == -1) {//if surface vertex is NOT mapped directly to tet mesh vetex
+				for (int tet = 0; tet < tetMeshTetrahedra.size(); tet++) {// for each tetrahedron
 					ivec4 tetMeshVertexId = tetMeshTetrahedra[tet];
 					vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
 					vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
 					vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
 					vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
-					if (bcmapping::isVertexInsideTetrahedron(v0, v1, v2,v3,inputVertices[vertex])) {
-						minDistances[vertex] = 0;
-						closestTets[vertex] = tet;
-						insideFlags[vertex] = 1;
-						task::self().cancel_group_execution();
+					// check if vert is in tetrahedron, else remember closest tetrahedron
+					if (bcmapping::isVertexInsideTetrahedron(v0, v1, v2, v3, inputVertices[vertex])) {
+						barycentricTetrahedronIds[vertex] = tet;
+						break;
 					} else {
 						float distance = getVertexDistanceToTetrahedronCenter(v0, v1, v2, v3, inputVertices[vertex]);
 						if (distance < minDistance) {
 							minDistance = distance;
-							minDistances[vertex] = distance;
-							closestTets[vertex] = tet;
+							barycentricTetrahedronIds[vertex] = tet;
 						}
 					}
-				});
+				}
 			}
+		}
+	}
+
+	void generateBarycentricMapping(
+		const vector<vec3>& inputVertices,
+		const vector<vec3>& tetMeshVertices,
+		const vector<ivec4>& tetMeshTetrahedra,
+		vector<vec4>& barycentricCoords,
+		vector<int>& barycentricTetrahedronIds) {
+
+		logger::log("--findBaryCentricCoordinatedForVerticesWithMapping");
+		if (barycentricTetrahedronIds.size() != inputVertices.size())
+			logger::logError("\tbarycetric tet ids must be calculated before hand");
+		barycentricCoords.resize(inputVertices.size(), vec4());
+
+		parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {		//for each input vertex
+			ivec4 tetMeshVertexId = tetMeshTetrahedra[barycentricTetrahedronIds[vertex]];
+			vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
+			vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
+			vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
+			vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
+			barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, inputVertices[vertex]);
 		});
 	}
 
 	// Generates barycentric mapping for a set of input vertices and a tetrahedral mesh.
 	// Uses pre-calculated closest tetrahedra for barycentric mapping.
-	void findBaryCentricCoordinatesForVerticesWithMapping(
+	void generateBarycentricMapping_m(
 		const vector<vec3>& inputVertices,
 		const vector<vec3>& tetMeshVertices,
 		const vector<ivec4>& tetMeshTetrahedra,
 		const vector<int>& surfaceToTetMeshVertexMap,
 		vector<vec4>& barycentricCoords,
-		vector<int>& barycentricTetrahedronIds,
-		const vector<int>& insideFlags,
-		const vector<int>& closestTets) {
+		vector<int>& barycentricTetrahedronIds) {
 
 		logger::log("--findBaryCentricCoordinatedForVerticesWithMapping");
-
+		if (barycentricTetrahedronIds.size() != inputVertices.size())
+			logger::logError("\tbarycetric tet ids must be calculated before hand");
 		barycentricCoords.resize(inputVertices.size(), vec4());
-		barycentricTetrahedronIds.resize(inputVertices.size(), 0);
-
-		float result = 0.0f;
-		//float minDistance;
-		unsigned int closestTetrahedronIndex;
-		bool isInside;
-
+		//barycentricTetrahedronIds.resize(inputVertices.size(), 0);
+		
 		parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {		//for each input vertex
-		//	minDistance = FLT_MAX;
-			isInside = false;
-			vec3 vert = inputVertices[vertex];
 			if (surfaceToTetMeshVertexMap[vertex] != -1) { // vertex can be directly mapped to a tetmesh vertex
 				barycentricCoords[vertex] = vec4();
 				barycentricTetrahedronIds[vertex] = -1;
 			} else { // vertex is mapped to a tetmesh tetrahedron
-				ivec4 tetMeshVertexId = tetMeshTetrahedra[closestTets[vertex]];
+				ivec4 tetMeshVertexId = tetMeshTetrahedra[barycentricTetrahedronIds[vertex]];
 				vec3 v0 = tetMeshVertices[tetMeshVertexId.x];
 				vec3 v1 = tetMeshVertices[tetMeshVertexId.y];
 				vec3 v2 = tetMeshVertices[tetMeshVertexId.z];
 				vec3 v3 = tetMeshVertices[tetMeshVertexId.w];
-				barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, vert);
-				barycentricTetrahedronIds[vertex] = closestTets[vertex];
+				barycentricCoords[vertex] = getBarycentricCoordinate(v0, v1, v2, v3, inputVertices[vertex]);
 			}
 		});
 	}
 
+
+	//TODO: change flags to bool (is in map: true, else is inside true else false)
 	// Generates barycentric mapping for a set of input vertices and a tetrahedral mesh.
-	void findBaryCentricCoordinatesForVerticesWithMapping(
+	/*void findBaryCentricCoordinatesForVerticesWithMapping(
 		const vector<vec3>& inputVertices,
 		const vector<vec3>& tetMeshVertices,
 		const vector<ivec4> &tetMeshTetrahedra,
@@ -230,10 +267,10 @@ namespace bcmapping {
 				}
 			}
 		});
-	}
+	}*/
 
 	// Generates barycentric mapping for a set of input vertices and a tetrahedral mesh.
-	void findBaryCentricCoordinatesForVerticesWithMapping(
+	/*void findBaryCentricCoordinatesForVerticesWithMapping(
 		const vector<vec3>& inputVertices,
 		const vector<vec3>& tetMeshVertices,
 		const vector<ivec4> &tetMeshTetrahedra,
@@ -298,7 +335,7 @@ namespace bcmapping {
 				}
 			}
 		});
-	}
+	}*/
 
 	/*void findBaryCentricCoordinatedForVertices(
 		const vector<vec3>& inputVertices,
@@ -357,28 +394,37 @@ namespace bcmapping {
 		return v0 * barycentricCoord.x + v1 * barycentricCoord.y + v2 * barycentricCoord.z + v3 * barycentricCoord.w;
 	}
 
-	int findIdOfSimilar(const vec3& v, const vector<vec3>& set, float delta) {
-		int id = -1;
-		parallel_for((size_t)0, set.size(), [&](size_t &i) {
-			if ((abs(set[i].x - v.x) < delta) && (abs(set[i].y - v.y) < delta) && (abs(set[i].z - v.z) < delta)) {
-				id = i;
-				task::self().cancel_group_execution();
-			}
-		});
-		return id;
-	}
-
 	void indexSubsetVertices(const vector<vec3> &subSet, vector<vec3>& superSet, vector<int>& indeces) {
 		logger::log("--indexSubsetVertices");
 		logger::log("\t -subset count:" + to_string(subSet.size()) + ",\t superSet count: " + to_string(superSet.size()));
 		indeces.resize(subSet.size(), -1);
 		parallel_for((size_t)0, subSet.size(), [&](size_t &i) {
-			indeces[i] = findIdOfSimilar(subSet[i], superSet, 0.01f);
+			indeces[i] = vectorFuncs::findIdOfSimilar(subSet[i], superSet, 0.01f);
 		});
 	}
-	
+
 	// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
-	void updateSurfaceVerticesWithMapping(
+	void updateSurfaceVertices(
+		vector<vec3>& surfaceVertices,
+		const vector<vec3>& tetMeshVertices,
+		const vector<ivec4> &tetMeshTetrahedra,
+		const vector<vec4>& barycentricCoords,
+		const vector<int>& barycentricTetIds) {
+
+		//logger::log("--updateSurfaceVerticesWithMapping");
+		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t surfVertex) {
+			// get positions of related verts
+			ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[surfVertex]];
+			vec3 v0 = tetMeshVertices[tetMeshTetrahedron.x];
+			vec3 v1 = tetMeshVertices[tetMeshTetrahedron.y];
+			vec3 v2 = tetMeshVertices[tetMeshTetrahedron.z];
+			vec3 v3 = tetMeshVertices[tetMeshTetrahedron.w];
+			surfaceVertices[surfVertex] = getPositionByBarycentricCoord(v0, v1, v2, v3, barycentricCoords[surfVertex]);
+		});
+	}
+
+	// updates the positions of a set of input vertices according to their respective barycentric coordinates with regards to the tet mesh vertices.
+	void updateSurfaceVertices_m(
 		vector<vec3>& surfaceVertices,
 		const vector<vec3>& tetMeshVertices,
 		const vector<ivec4> &tetMeshTetrahedra,
@@ -390,8 +436,7 @@ namespace bcmapping {
 		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t surfVertex) {
 			if (surfaceToTetMeshVertexMap[surfVertex] != -1) {
 				surfaceVertices[surfVertex] = tetMeshVertices[surfaceToTetMeshVertexMap[surfVertex]];
-			}
-			else {
+			} else {
 				// get positions of related verts
 				ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[surfVertex]];
 				vec3 v0 = tetMeshVertices[tetMeshTetrahedron.x];
