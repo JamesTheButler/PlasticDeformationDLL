@@ -49,6 +49,7 @@ Constraints::VolumeConstraintData _volumeConstraints;
 vector<vec3> _distanceDeltas;
 vector<vec3> _volumeDeltas;
 ColliderData _collData;
+vector<int> _collisions;
 
 string _projectPath;
 string _tetrahedralizationPath;
@@ -83,6 +84,7 @@ void teardown() {
 	vector<int>().swap(_barycentricTetIds);
 	vector<vec3>().swap(_distanceDeltas);
 	vector<vec3>().swap(_volumeDeltas);
+	vector<int>().swap(_collisions);
 }
 
 #pragma region solver
@@ -280,21 +282,30 @@ void solveConstraints() {
 	solveVolumeConstraintsGaussSeidel();
 }
 
-void getCollisionResult(int colliderId) {
+void solve() {
+	//if there is no collision then there is no solving
+	if (_collisions.size() == 0)
+		return;
+
 	auto startTime = chrono::high_resolution_clock::now();
 
-	vec3 collPos = _collData.colliderPositions[colliderId];
-	vec3 collSize = _collData.colliderSizes[colliderId];
-	int collType = _collData.colliderTypes[colliderId];
-	
-	for (int i = 0; i < _iterationCount; i++) {
+	// project all collisions
+	for (int collisionId = 0; collisionId < _collisions.size(); collisionId++) {
+		int collisideId = _collisions[collisionId];
+		vec3 collPos = _collData.colliderPositions[collisideId];
+		vec3 collSize = _collData.colliderSizes[collisideId];
+		int collType = _collData.colliderTypes[collisideId];
 		projectVertices(collPos, collSize, collType);
-		//solveConstraints();
+	}
+	_collisions.resize(0);
+	//solve constraints
+	for (int i = 0; i < _iterationCount; i++) {
+		solveConstraints();
 	}
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
 	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
-	logger::log("solver time: "+to_string(_solverDeltaTime));
+	//logger::log("solver time: "+to_string(_solverDeltaTime));
 }
 #pragma endregion solver
 
@@ -321,6 +332,13 @@ void setColliders(float* colliderPositions, float* colliderSizes, int* colliderT
 void setTetMeshTransforms(float* translation, float* rotation) {
 	_tetMeshPosition = vec3(translation[0], translation[1], translation[2]);
 	_tetMeshRotation = vec3(rotation[0], rotation[1], rotation[2]);
+}
+
+void setCollisions(int* collisions, int collisionCount) {
+	_collisions.resize(collisionCount);
+	for (int i = 0; i < collisionCount; i++) {
+		_collisions[i] = collisions[i];
+	}
 }
 
 void setIterationCount(int iterationCount) {
@@ -424,6 +442,9 @@ bool init() {
 // TODO: change the size of the memcpy vector to result.size() * sizeof(x) (rather than _some_vector.size()*3*sizeof(x))
 extern "C" {
 #pragma region Setters
+	DLL_EXPORT void dll_setCollisions(int* collisions, int collisionCount) {
+		setCollisions(collisions, collisionCount);
+	}
 	DLL_EXPORT void dll_setIterationCount(int iterationCount) {
 		setIterationCount(iterationCount);
 	}
@@ -575,8 +596,8 @@ extern "C" {
 	}
 #pragma endregion Getters
 #pragma region Calculations
-	DLL_EXPORT void dll_getCollisionResult(int collId) {
-		getCollisionResult(collId);
+	DLL_EXPORT void dll_solve() {
+		solve();
 	}
 	DLL_EXPORT void dll_project(int collId) {
 		vec3 collPos = _collData.colliderPositions[collId];
