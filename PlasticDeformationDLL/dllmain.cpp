@@ -278,7 +278,7 @@ void solveDistanceConstraintsJacobi() {
 }
 
 void solveConstraints() {
-	solveDistanceConstraintsJacobi();
+	solveDistanceConstraintsGaussSeidel();
 	solveVolumeConstraintsGaussSeidel();
 }
 
