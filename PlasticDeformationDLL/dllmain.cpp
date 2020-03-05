@@ -184,6 +184,8 @@ void solveVolumeConstraintsGaussSeidel() {
 	}
 }
 
+
+// !!! Doesn't work !!!
 void solveVolumeConstraintsJacobi() {
 	//clear deltas
 	vector<vec3>(_tetMeshVertices.size(), vec3(0, 0, 0)).swap(_volumeDeltas);
@@ -250,7 +252,8 @@ void solveDistanceConstraintsGaussSeidel() {
 	}
 }
 
-// Jacobi implementation of the distance constraint solver
+// !!! Unstable !!!
+// Jacobi implementation of the distance constraint solver. 
 void solveDistanceConstraintsJacobi() {
 	// clear deltas
 	vector<vec3>(_tetMeshVertices.size()).swap(_distanceDeltas);
@@ -276,7 +279,7 @@ void solveDistanceConstraintsJacobi() {
 }
 
 void solveConstraints() {
-	solveDistanceConstraintsJacobi();
+	solveDistanceConstraintsGaussSeidel();
 	solveVolumeConstraintsGaussSeidel();
 }
 
@@ -289,7 +292,7 @@ void getCollisionResult(int colliderId) {
 	
 	for (int i = 0; i < _iterationCount; i++) {
 		projectVertices(collPos, collSize, collType);
-		//solveConstraints();
+		solveConstraints();
 	}
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
