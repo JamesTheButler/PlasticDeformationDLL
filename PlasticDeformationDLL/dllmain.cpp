@@ -182,7 +182,7 @@ void solveVolumeConstraintsGaussSeidel() {
 		_tetMeshVertices[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement;
 		_tetMeshVertices[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement;
 		//update rest values
-		_volumeConstraints.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraints.restValues[i], _plasticityFactor);
+		_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]),  _plasticityFactor);
 	}
 }
 
@@ -237,7 +237,7 @@ void solveVolumeConstraintsJacobi() {
 		verts[1] = _tetMeshVertices[_volumeConstraints.vertexIds[i].y];
 		verts[2] = _tetMeshVertices[_volumeConstraints.vertexIds[i].z];
 		verts[3] = _tetMeshVertices[_volumeConstraints.vertexIds[i].w];
-		_volumeConstraints.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraints.restValues[i], _plasticityFactor);
+		_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _plasticityFactor);
 	});
 }
 
@@ -250,7 +250,11 @@ void solveDistanceConstraintsGaussSeidel() {
 		vec3 delta = normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
 		_tetMeshVertices[id1] += delta;
 		_tetMeshVertices[id2] -= delta;
-		_distanceConstraints.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraints.restValues[i], _plasticityFactor);
+	//}
+	//for (int i = 0; i < _distanceConstraints.constraintCount; i++) {
+	//	int id1 = _distanceConstraints.vertexIds[i].x;
+	//	int id2 = _distanceConstraints.vertexIds[i].y;
+		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
 	}
 }
 
@@ -276,12 +280,12 @@ void solveDistanceConstraintsJacobi() {
 	parallel_for((size_t)0, _distanceConstraints.constraintCount - 1, (size_t)1, [=](size_t i) {
 		int id1 = _distanceConstraints.vertexIds[i].x;
 		int id2 = _distanceConstraints.vertexIds[i].y;
-		_distanceConstraints.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraints.restValues[i], _plasticityFactor);
+		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
 	});
 }
 
 void solveConstraints() {
-	solveDistanceConstraintsGaussSeidel();
+	//solveDistanceConstraintsGaussSeidel();
 	solveVolumeConstraintsGaussSeidel();
 }
 
