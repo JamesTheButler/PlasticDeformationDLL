@@ -289,7 +289,7 @@ void getCollisionResult(int colliderId) {
 	
 	for (int i = 0; i < _iterationCount; i++) {
 		projectVertices(collPos, collSize, collType);
-		//solveConstraints();
+		solveConstraints();
 	}
 
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
