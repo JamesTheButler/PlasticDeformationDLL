@@ -49,6 +49,7 @@ Constraints::VolumeConstraintData _volumeConstraints;
 vector<vec3> _distanceDeltas;
 vector<vec3> _volumeDeltas;
 ColliderData _collData;
+vector<int> _collisions;
 
 string _projectPath;
 string _tetrahedralizationPath;
@@ -83,6 +84,7 @@ void teardown() {
 	vector<int>().swap(_barycentricTetIds);
 	vector<vec3>().swap(_distanceDeltas);
 	vector<vec3>().swap(_volumeDeltas);
+	vector<int>().swap(_collisions);
 }
 
 #pragma region solver
@@ -180,10 +182,12 @@ void solveVolumeConstraintsGaussSeidel() {
 		_tetMeshVertices[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement;
 		_tetMeshVertices[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement;
 		//update rest values
-		_volumeConstraints.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraints.restValues[i], _plasticityFactor);
+		_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]),  _plasticityFactor);
 	}
 }
 
+
+// !!! Doesn't work !!!
 void solveVolumeConstraintsJacobi() {
 	//clear deltas
 	vector<vec3>(_tetMeshVertices.size(), vec3(0, 0, 0)).swap(_volumeDeltas);
@@ -194,7 +198,7 @@ void solveVolumeConstraintsJacobi() {
 		ivec4 vertIds = _volumeConstraints.vertexIds[i];
 		verts[0] = _tetMeshVertices[vertIds.x];
 		verts[1] = _tetMeshVertices[vertIds.y];
-		verts[2] = _tetMeshVertices[vertIds.z]; 
+		verts[2] = _tetMeshVertices[vertIds.z];
 		verts[3] = _tetMeshVertices[vertIds.w];
 
 		float volumeDifference = _volumeConstraints.restValues[i] - geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]);
@@ -210,7 +214,7 @@ void solveVolumeConstraintsJacobi() {
 		// determine deltas
 		// denominator of the scaling factor
 		float sum_squared_grad_p = dot(grad[0], grad[0]) + dot(grad[1], grad[1]) + dot(grad[2], grad[2]) + dot(grad[3], grad[3]);
-		
+
 		float displacement = 0;
 		if (sum_squared_grad_p > 0.00001f) {
 			displacement = (volumeDifference / sum_squared_grad_p);
@@ -233,7 +237,7 @@ void solveVolumeConstraintsJacobi() {
 		verts[1] = _tetMeshVertices[_volumeConstraints.vertexIds[i].y];
 		verts[2] = _tetMeshVertices[_volumeConstraints.vertexIds[i].z];
 		verts[3] = _tetMeshVertices[_volumeConstraints.vertexIds[i].w];
-		_volumeConstraints.restValues[i] = misc::lerp(geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _volumeConstraints.restValues[i], _plasticityFactor);
+		_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _plasticityFactor);
 	});
 }
 
@@ -246,11 +250,16 @@ void solveDistanceConstraintsGaussSeidel() {
 		vec3 delta = normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
 		_tetMeshVertices[id1] += delta;
 		_tetMeshVertices[id2] -= delta;
-		_distanceConstraints.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraints.restValues[i], _plasticityFactor);
+	//}
+	//for (int i = 0; i < _distanceConstraints.constraintCount; i++) {
+	//	int id1 = _distanceConstraints.vertexIds[i].x;
+	//	int id2 = _distanceConstraints.vertexIds[i].y;
+		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
 	}
 }
 
-// Jacobi implementation of the distance constraint solver
+// !!! Unstable !!!
+// Jacobi implementation of the distance constraint solver.
 void solveDistanceConstraintsJacobi() {
 	// clear deltas
 	vector<vec3>(_tetMeshVertices.size()).swap(_distanceDeltas);
@@ -271,30 +280,40 @@ void solveDistanceConstraintsJacobi() {
 	parallel_for((size_t)0, _distanceConstraints.constraintCount - 1, (size_t)1, [=](size_t i) {
 		int id1 = _distanceConstraints.vertexIds[i].x;
 		int id2 = _distanceConstraints.vertexIds[i].y;
-		_distanceConstraints.restValues[i] = misc::lerp(distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _distanceConstraints.restValues[i], _plasticityFactor);
+		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
 	});
 }
 
 void solveConstraints() {
-	solveDistanceConstraintsJacobi();
+	//solveDistanceConstraintsGaussSeidel();
 	solveVolumeConstraintsGaussSeidel();
 }
 
-void getCollisionResult(int colliderId) {
+void solve() {
+	//if there is no collision then there is no solving
+	if (_collisions.size() == 0)
+		return;
+
 	auto startTime = chrono::high_resolution_clock::now();
 
-	vec3 collPos = _collData.colliderPositions[colliderId];
-	vec3 collSize = _collData.colliderSizes[colliderId];
-	int collType = _collData.colliderTypes[colliderId];
-	
-	for (int i = 0; i < _iterationCount; i++) {
+	// project all collisions
+	for (int collisionId = 0; collisionId < _collisions.size(); collisionId++) {
+		int collisideId = _collisions[collisionId];
+		vec3 collPos = _collData.colliderPositions[collisideId];
+		vec3 collSize = _collData.colliderSizes[collisideId];
+		int collType = _collData.colliderTypes[collisideId];
 		projectVertices(collPos, collSize, collType);
+	}
+	_collisions.resize(0);
+
+	// solve constraints
+	for (int i = 0; i < _iterationCount; i++) {
 		solveConstraints();
 	}
-
+	// take solver time
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
 	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
-	logger::log("solver time: "+to_string(_solverDeltaTime));
+	//logger::log("solver time: "+to_string(_solverDeltaTime));
 }
 #pragma endregion solver
 
@@ -321,6 +340,13 @@ void setColliders(float* colliderPositions, float* colliderSizes, int* colliderT
 void setTetMeshTransforms(float* translation, float* rotation) {
 	_tetMeshPosition = vec3(translation[0], translation[1], translation[2]);
 	_tetMeshRotation = vec3(rotation[0], rotation[1], rotation[2]);
+}
+
+void setCollisions(int* collisions, int collisionCount) {
+	_collisions.resize(collisionCount);
+	for (int i = 0; i < collisionCount; i++) {
+		_collisions[i] = collisions[i];
+	}
 }
 
 void setIterationCount(int iterationCount) {
@@ -424,6 +450,9 @@ bool init() {
 // TODO: change the size of the memcpy vector to result.size() * sizeof(x) (rather than _some_vector.size()*3*sizeof(x))
 extern "C" {
 #pragma region Setters
+	DLL_EXPORT void dll_setCollisions(int* collisions, int collisionCount) {
+		setCollisions(collisions, collisionCount);
+	}
 	DLL_EXPORT void dll_setIterationCount(int iterationCount) {
 		setIterationCount(iterationCount);
 	}
@@ -499,10 +528,10 @@ extern "C" {
 		vector<vec3> newSurfVerts;
 		newSurfVerts.resize(_surfaceVertices.size());
 		/*bcmapping::updateSurfaceVertices_m(
-			newSurfVerts, 
+			newSurfVerts,
 			_tetMeshVertices,
 			_tetMeshTetrahedra,
-			_surfaceVertexToTetVertexMap, 
+			_surfaceVertexToTetVertexMap,
 			_barycentricCoordinates,
 			_barycentricTetIds
 		);*/
@@ -513,7 +542,7 @@ extern "C" {
 			_barycentricCoordinates,
 			_barycentricTetIds
 		);
-		
+
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);
 		memcpy(output, result.data(), result.size() * sizeof(float));
@@ -575,8 +604,8 @@ extern "C" {
 	}
 #pragma endregion Getters
 #pragma region Calculations
-	DLL_EXPORT void dll_getCollisionResult(int collId) {
-		getCollisionResult(collId);
+	DLL_EXPORT void dll_solve() {
+		solve();
 	}
 	DLL_EXPORT void dll_project(int collId) {
 		vec3 collPos = _collData.colliderPositions[collId];

@@ -16,8 +16,3 @@ bool intersect(AABB box, glm::vec3 point) {
 	if (point[2] > box.getMax()[2])  return false;
 	return true;
 }
-
-bool intersect(AABB aabb, OBB obb) {
-	
-	return true;
-}

@@ -396,7 +396,7 @@ namespace bcmapping {
 
 	void indexSubsetVertices(const vector<vec3> &subSet, vector<vec3>& superSet, vector<int>& indeces) {
 		logger::log("--indexSubsetVertices");
-		logger::log("\t -subset count:" + to_string(subSet.size()) + ",\t superSet count: " + to_string(superSet.size()));
+		logger::log("\t-subset count:" + to_string(subSet.size()) + ",\t superSet count: " + to_string(superSet.size()));
 		indeces.resize(subSet.size(), -1);
 		parallel_for((size_t)0, subSet.size(), [&](size_t &i) {
 			indeces[i] = vectorFuncs::findIdOfSimilar(subSet[i], superSet, 0.01f);

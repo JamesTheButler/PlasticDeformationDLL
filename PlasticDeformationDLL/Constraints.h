@@ -175,12 +175,4 @@ namespace Constraints {
 		distanceConstraintData.restValues.resize(distanceConstraintData.vertexIds.size());
 		distanceConstraintData.constraintCount = distanceConstraintData.vertexIds.size();
 	}
-
-	void solveConstraints(DistanceConstraintData& distanceConstraints, vector<vec3>& tetVertices, const float plasticity) {
-		
-	}
-
-	void solveConstraints(VolumeConstraintData& volumeConstraints, vector<vec3>& tetVertices, const float plasticity) {
-
-	}
 }
