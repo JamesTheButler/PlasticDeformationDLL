@@ -199,7 +199,7 @@ void solveVolumeConstraintsJacobi() {
 		ivec4 vertIds = _volumeConstraints.vertexIds[i];
 		verts[0] = _tetMeshVertices[vertIds.x];
 		verts[1] = _tetMeshVertices[vertIds.y];
-		verts[2] = _tetMeshVertices[vertIds.z]; 
+		verts[2] = _tetMeshVertices[vertIds.z];
 		verts[3] = _tetMeshVertices[vertIds.w];
 
 		float volumeDifference = _volumeConstraints.restValues[i] - geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]);
@@ -215,7 +215,7 @@ void solveVolumeConstraintsJacobi() {
 		// determine deltas
 		// denominator of the scaling factor
 		float sum_squared_grad_p = dot(grad[0], grad[0]) + dot(grad[1], grad[1]) + dot(grad[2], grad[2]) + dot(grad[3], grad[3]);
-		
+
 		float displacement = 0;
 		if (sum_squared_grad_p > 0.00001f) {
 			displacement = (volumeDifference / sum_squared_grad_p);
@@ -265,7 +265,7 @@ void solveDistanceConstraintsGaussSeidel() {
 }
 
 // !!! Unstable !!!
-// Jacobi implementation of the distance constraint solver. 
+// Jacobi implementation of the distance constraint solver.
 void solveDistanceConstraintsJacobi() {
 	// clear deltas
 	vector<vec3>(_tetMeshVertices.size()).swap(_distanceDeltas);
@@ -311,7 +311,7 @@ void solve() {
 		projectVertices(collPos, collSize, collType);
 	}
 	_collisions.resize(0);
-	
+
 	// solve constraints
 	for (int i = 0; i < _iterationCount; i++) {
 		solveConstraints();
@@ -534,10 +534,10 @@ extern "C" {
 		vector<vec3> newSurfVerts;
 		newSurfVerts.resize(_surfaceVertices.size());
 		/*bcmapping::updateSurfaceVertices_m(
-			newSurfVerts, 
+			newSurfVerts,
 			_tetMeshVertices,
 			_tetMeshTetrahedra,
-			_surfaceVertexToTetVertexMap, 
+			_surfaceVertexToTetVertexMap,
 			_barycentricCoordinates,
 			_barycentricTetIds
 		);*/
@@ -548,7 +548,7 @@ extern "C" {
 			_barycentricCoordinates,
 			_barycentricTetIds
 		);
-		
+
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);
 		memcpy(output, result.data(), result.size() * sizeof(float));

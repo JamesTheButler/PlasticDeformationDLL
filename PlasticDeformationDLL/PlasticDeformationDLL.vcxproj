@@ -91,15 +91,15 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files %28x86%29\Tools\IntelSWTools\compilers_and_libraries_2019.4.245\windows\tbb\include;C:\local\glm-0.9.9.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\local\glm-0.9.9.6;C:\Program Files %28x86%29\Tools\Development\IntelSWTools\compilers_and_libraries_2019.5.281\windows\tbb\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_WINDLL;USE_PROFILE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Tools\IntelSWTools\compilers_and_libraries_2019.4.245\windows\tbb\lib\intel64_win\vc14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Tools\Development\IntelSWTools\compilers_and_libraries_2019.5.281\windows\tbb\lib\intel64_win\vc14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>tbb.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>call "$(SolutionDir)postbuild_d.bat"</Command>
+      <Command>call "$(SolutionDir)BuildScripts\postbuild_d.bat"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>call "$(SolutionDir)prebuild.bat"</Command>
@@ -127,19 +127,19 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files %28x86%29\Tools\IntelSWTools\compilers_and_libraries_2019.4.245\windows\tbb\include;C:\local\glm-0.9.9.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\local\glm-0.9.9.6;C:\Program Files %28x86%29\Tools\Development\IntelSWTools\compilers_and_libraries_2019.5.281\windows\tbb\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Tools\IntelSWTools\compilers_and_libraries_2019.4.245\windows\tbb\lib\intel64_win\vc14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Tools\Development\IntelSWTools\compilers_and_libraries_2019.5.281\windows\tbb\lib\intel64_win\vc14;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>tbb.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>call "$(SolutionDir)postbuild_r.bat"</Command>
+      <Command>rem call "$(SolutionDir)BuildScripts\postbuild_r.bat"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
