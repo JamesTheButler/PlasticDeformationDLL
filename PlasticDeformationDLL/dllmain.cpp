@@ -155,6 +155,7 @@ void solveVolumeConstraintsGaussSeidel() {
 		verts[2] = _tetMeshVertices[vertIds.z];
 		verts[3] = _tetMeshVertices[vertIds.w];
 		// determine delta
+		_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _plasticityFactor);
 		float volumeDifference = _volumeConstraints.restValues[i] - geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]);
 		// determine displacement vectors per vertex (normals of opposing faces)
 		vec3 p0p1 = verts[1] - verts[0];
@@ -182,7 +183,7 @@ void solveVolumeConstraintsGaussSeidel() {
 		_tetMeshVertices[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement;
 		_tetMeshVertices[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement;
 		//update rest values
-		_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]),  _plasticityFactor);
+		//_volumeConstraints.restValues[i] = misc::lerp(_volumeConstraints.restValues[i], geometry::getTetrahedronVolume(verts[0], verts[1], verts[2], verts[3]), _plasticityFactor);
 	}
 }
 
@@ -247,6 +248,10 @@ void solveDistanceConstraintsGaussSeidel() {
 		int id1 = _distanceConstraints.vertexIds[i].x;
 		int id2 = _distanceConstraints.vertexIds[i].y;
 		float currentDistance = distance(_tetMeshVertices[id1], _tetMeshVertices[id2]);
+
+		// rest distance = lerp (current distance, rest, plasticitz)
+		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
+
 		vec3 delta = normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
 		_tetMeshVertices[id1] += delta;
 		_tetMeshVertices[id2] -= delta;
@@ -254,7 +259,8 @@ void solveDistanceConstraintsGaussSeidel() {
 	//for (int i = 0; i < _distanceConstraints.constraintCount; i++) {
 	//	int id1 = _distanceConstraints.vertexIds[i].x;
 	//	int id2 = _distanceConstraints.vertexIds[i].y;
-		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
+		//_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
+		//_distanceConstraints.restValues[i] = distance(_tetMeshVertices[id1], _tetMeshVertices[id2]);
 	}
 }
 

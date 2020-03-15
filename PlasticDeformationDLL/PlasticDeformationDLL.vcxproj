@@ -150,14 +150,12 @@
     <ClInclude Include="BarycentricMapping.h" />
     <ClInclude Include="ColliderData.h" />
     <ClInclude Include="Constraints.h" />
-    <ClInclude Include="DistanceConstraintData.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="FileWriter.h" />
     <ClInclude Include="Intersection.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Misc.h" />
     <ClInclude Include="Solver.h" />
-    <ClInclude Include="VolumeConstraintData.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

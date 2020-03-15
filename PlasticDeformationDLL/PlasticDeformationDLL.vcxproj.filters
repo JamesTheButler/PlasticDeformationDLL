@@ -29,12 +29,6 @@
     <ClInclude Include="ColliderData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DistanceConstraintData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VolumeConstraintData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="BarycentricMapping.h">
       <Filter>Header Files</Filter>
     </ClInclude>

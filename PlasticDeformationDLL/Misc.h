@@ -121,7 +121,8 @@ namespace geometry{
 
 namespace misc {
 	// Linear interpolation between val1 and val2.
-	float lerp(const float val1, const float val2, const float t) {
+	float lerp(const float val1, const float val2, float t) {
+		t = clamp(t, 0.0f, 1.0f);
 		return (1.0f - t) * val1 + t * val2;
 	}
 }
