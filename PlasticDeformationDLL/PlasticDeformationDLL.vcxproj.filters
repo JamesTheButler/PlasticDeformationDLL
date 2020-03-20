@@ -50,5 +50,8 @@
     <ClInclude Include="Constraints.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Serialization.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

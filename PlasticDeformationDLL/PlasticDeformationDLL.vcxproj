@@ -139,7 +139,7 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>rem call "$(SolutionDir)BuildScripts\postbuild_r.bat"</Command>
+      <Command>call "$(SolutionDir)BuildScripts\postbuild_r.bat"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -155,6 +155,7 @@
     <ClInclude Include="Intersection.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Misc.h" />
+    <ClInclude Include="Serialization.h" />
     <ClInclude Include="Solver.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
