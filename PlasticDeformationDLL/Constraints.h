@@ -149,7 +149,7 @@ public:
 	}
 };
 
-void generateConstraints_serial(
+void generateConstraints_S(
 	const vector<vec3> &vertices,
 	const vector<ivec4> &tetrahedra,
 	DistanceConstraintData &distanceConstraintData,

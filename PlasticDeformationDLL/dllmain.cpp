@@ -89,6 +89,8 @@ void teardown() {
 	vector<vec3>().swap(_distanceDeltas);
 	vector<vec3>().swap(_volumeDeltas);
 	vector<int>().swap(_collisions);
+	vector<int>().swap(_initExecutionTimes);
+	vector<int>().swap(_solverExecutionTimes);
 }
 
 #pragma region solver
@@ -405,8 +407,67 @@ bool initFromFile(string fileName) {
 	logger::log("--init done");
 }
 
+bool init_S() {
+	auto initStartTime = chrono::high_resolution_clock::now();
+	logger::log("--init");
+
+	_initExecutionTimes.resize(7, 0);
+	_solverExecutionTimes.resize(13, 0);
+
+	// generate file paths
+	string tetMeshFilePath = _tetrahedralizationPath + _fileName + ".obj.mesh";
+
+	string tetMeshSurfaceFilePath = _tetrahedralizationPath + _fileName + ".obj.mesh__sf.obj";
+	logger::log("\t-reading files.. " + tetMeshFilePath);
+	// read tet mesh file
+	auto readFileStartTime = chrono::high_resolution_clock::now();
+	logger::log("\t-parsing tet mesh data file");
+	if (!fileReader::fileExists(tetMeshFilePath)) {
+		logger::logError("\t\t" + tetMeshFilePath + " does not exist");
+		return false;
+	}
+	fileReader::parseFile_obj_mesh(tetMeshFilePath, _tetMeshVertices, _tetMeshTetrahedra);
+	auto readFileStopTime = chrono::high_resolution_clock::now();
+	_initExecutionTimes[1] = chrono::duration_cast<chrono::milliseconds>(readFileStopTime - readFileStartTime).count();
+	// generate constraints
+	logger::log("\t-generate constraints... ");
+	auto constGenStartTime = chrono::high_resolution_clock::now();
+	generateConstraints_S(_tetMeshVertices, _tetMeshTetrahedra, _distanceConstraints, _volumeConstraints);
+	// set size of delta values for constraints
+	_distanceDeltas.resize(_tetMeshVertices.size(), vec3());
+	_volumeDeltas.resize(_tetMeshVertices.size(), vec3());
+	logger::log("\t-Constraints generated. ");
+	auto constGenStopTime = chrono::high_resolution_clock::now();
+	_initExecutionTimes[2] = chrono::duration_cast<chrono::milliseconds>(constGenStopTime - constGenStartTime).count();
+	auto bcStartTime1 = chrono::high_resolution_clock::now();
+	// barycentric mapping
+	logger::log("Barycentric Mapping...");
+	bcmapping::findBarycentricTetIds_S(
+		_surfaceVertices,
+		_tetMeshVertices,
+		_tetMeshTetrahedra,
+		_barycentricTetIds
+	);
+	auto bcStopTime1 = chrono::high_resolution_clock::now();
+	_initExecutionTimes[3] = chrono::duration_cast<chrono::milliseconds>(bcStopTime1 - bcStartTime1).count();
+	auto bcStartTime2 = chrono::high_resolution_clock::now();
+	bcmapping::generateBarycentricMapping_S(
+		_surfaceVertices,
+		_tetMeshVertices,
+		_tetMeshTetrahedra,
+		_barycentricCoordinates,
+		_barycentricTetIds
+	);
+	logger::log("Barycentric Mapping done.");
+	auto bcStopTime2 = chrono::high_resolution_clock::now();
+	_initExecutionTimes[4] = chrono::duration_cast<chrono::milliseconds>(bcStopTime2 - bcStartTime2).count();
+	auto initStopTime = chrono::high_resolution_clock::now();
+	_initExecutionTimes[0] = chrono::duration_cast<chrono::milliseconds>(initStopTime - initStartTime).count();
+	logger::log("-- init done");
+	return true;
+}
+
 bool init() {
-	// TODO: TIME init
 	auto initStartTime = chrono::high_resolution_clock::now();
 	logger::log("--init");
 
@@ -431,7 +492,7 @@ bool init() {
 
 	logger::log("\t-generate constraints... ");
 	auto constGenStartTime = chrono::high_resolution_clock::now();
-	generateConstraints(_tetMeshVertices, _tetMeshTetrahedra, _distanceConstraints, _volumeConstraints);
+	generateConstraints_S(_tetMeshVertices, _tetMeshTetrahedra, _distanceConstraints, _volumeConstraints);
 	// set size of delta values for constraints
 	_distanceDeltas.resize(_tetMeshVertices.size(), vec3());
 	_volumeDeltas.resize(_tetMeshVertices.size(), vec3());
@@ -669,6 +730,9 @@ extern "C" {
 #pragma region setup/setdown
 	DLL_EXPORT void dll_init() {
 		init();
+	}
+	DLL_EXPORT void dll_init_S() {
+		init_S();
 	}
 	DLL_EXPORT void dll_initFromFile(const char* fileName, int charCount) {
 		initFromFile(vectorFuncs::charPtrToString(fileName, charCount));
