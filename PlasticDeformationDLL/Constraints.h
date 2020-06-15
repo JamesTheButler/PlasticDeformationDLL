@@ -15,6 +15,21 @@ using namespace tbb;
 
 class DistanceConstraintData {
 public:
+	static const int N = 21;
+
+	struct DistanceConstraint {
+		ivec2 vertex_ids;
+		float rest_value;
+	};
+
+	DistanceConstraint all_constraints[N];
+
+	ivec2 vertex_ids[N];
+	float rest_value[N];
+
+
+
+
 	vector<ivec2> vertexIds;
 	vector<float> restValues;
 	vector<int> constraintCountPerVertex;
@@ -171,7 +186,6 @@ void generateConstraints_S(
 	vec3 vertex[4];
 	int tetVertexIDs[4];
 	//for each tetrahdedron
-	//parallel_for((size_t)0, tetCount, (size_t)1, [&](size_t &tetId) {
 	for (int tetId = 0; tetId < tetCount; tetId++) {
 		//get 4 vertices and their ids
 		ivec4 tet = tetrahedra[tetId];
@@ -193,7 +207,7 @@ void generateConstraints_S(
 		// generate volume constraint per tetrahedron
 		volumeConstraintData.addConstraint(ivec4(tetVertexIDs[0], tetVertexIDs[1], tetVertexIDs[2], tetVertexIDs[3]),
 			geometry::getTetrahedronVolume(vertex[0], vertex[1], vertex[2], vertex[3]));
-	}//);
+	}
 	// resize data constrainers and set constraint count
 	distanceConstraintData.vertexIds.resize(distanceConstraintData.vertexIds.size());
 	distanceConstraintData.restValues.resize(distanceConstraintData.vertexIds.size());
