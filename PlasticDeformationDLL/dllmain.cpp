@@ -197,7 +197,7 @@ void solveVolumeConstraintsGaussSeidel() {
 
 		float displacement = 0;
 		if (sum_squared_grad_p > 0.001f) {
-			displacement = (volumeDifference / sum_squared_grad_p) /** (1-_volume_stiffness)*/;
+			displacement = (volumeDifference / sum_squared_grad_p) * _volume_stiffness;
 		}
 		else {
 			displacement = 0;
@@ -274,7 +274,7 @@ void solveDistanceConstraintsGaussSeidel() {
 
 		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
 
-		vec3 delta = /*(1 - _distance_stiffness) * */normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
+		vec3 delta = _distance_stiffness * normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
 		_tetMeshVertices[id1] += delta;
 		_tetMeshVertices[id2] -= delta;
 	}
@@ -317,8 +317,10 @@ void solve() {
 		return;
 
 	auto startTime = chrono::high_resolution_clock::now();
-
+	_solverDeltaTime = 0;
 	// project all collisions
+	if (_collisions.size()==0)
+		return;
 	for (int collisionId = 0; collisionId < _collisions.size(); collisionId++) {
 		int collisideId = _collisions[collisionId];
 		projectVertices(_collData.colliderPositions[collisideId], _collData.colliderSizes[collisideId], _collData.colliderTypes[collisideId]);
@@ -768,7 +770,6 @@ extern "C" {
 		);
 		_debugFloat = _surfaceVertices.size();
 		_solverExecutionTimes[3] = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count();
-		
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);
 		memcpy(output, result.data(), result.size() * sizeof(float));
@@ -873,7 +874,7 @@ extern "C" {
 		solveConstraints();
 	}
 	DLL_EXPORT void dll_solveDistanceConstraints() {
-		//solveDistanceConstraintsJacobi();
+		solveDistanceConstraintsGaussSeidel();
 	}
 	DLL_EXPORT void dll_solveVolumeConstraints() {
 		solveVolumeConstraintsGaussSeidel();

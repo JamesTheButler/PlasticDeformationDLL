@@ -142,7 +142,7 @@ namespace bcmapping {
 
 		barycentricTetrahedronIds.resize(inputVertices.size(), -1);
 		// generate subset map
-		vectorFuncs::indexSubsetVertices(inputVertices, tetMeshVertices, surfaceToTetMeshVertexMap);
+		//vectorFuncs::indexSubsetVertices(inputVertices, tetMeshVertices, surfaceToTetMeshVertexMap);
 
 		parallel_for((size_t)0, inputVertices.size(), (size_t)1, [&](size_t vertex) {
 			float minDistance = FLT_MAX;
@@ -180,7 +180,7 @@ namespace bcmapping {
 
 
 		// generate subset map
-		vectorFuncs::indexSubsetVertices(inputVertices, tetMeshVertices, surfaceToTetMeshVertexMap);
+		//vectorFuncs::indexSubsetVertices(inputVertices, tetMeshVertices, surfaceToTetMeshVertexMap);
 
 		barycentricTetrahedronIds.resize(inputVertices.size(), -1);
 		for (int vertex = 0; vertex < inputVertices.size(); vertex++) {		//for each input vertex
@@ -296,7 +296,7 @@ namespace bcmapping {
 		logger::log("\t-subset count:" + to_string(subSet.size()) + ",\t superSet count: " + to_string(superSet.size()));
 		indeces.resize(subSet.size(), -1);
 		parallel_for((size_t)0, subSet.size(), [&](size_t &i) {
-			indeces[i] = vectorFuncs::findIdOfSimilar(subSet[i], superSet, 0.01f);
+			//indeces[i] = vectorFuncs::findIdOfSimilar(subSet[i], superSet, 0.01f);
 		});
 	}
 
@@ -305,7 +305,7 @@ namespace bcmapping {
 		logger::log("\t-subset count:" + to_string(subSet.size()) + ",\t superSet count: " + to_string(superSet.size()));
 		indeces.resize(subSet.size(), -1);
 		parallel_for((size_t)0, subSet.size(), [&](size_t &i) {
-			indeces[i] = vectorFuncs::findIdOfSimilar(subSet[i], superSet, 0.01f);
+			//indeces[i] = vectorFuncs::findIdOfSimilar(subSet[i], superSet, 0.01f);
 		});
 	}
 
@@ -317,7 +317,6 @@ namespace bcmapping {
 		const vector<vec4>& barycentricCoords,
 		const vector<int>& barycentricTetIds) {
 
-		//logger::log("--updateSurfaceVerticesWithMapping");
 		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t surfVertex) {
 			// get positions of related verts
 			ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[surfVertex]];
@@ -338,7 +337,6 @@ namespace bcmapping {
 		const vector<vec4>& barycentricCoords,
 		const vector<int>& barycentricTetIds) {
 
-		//logger::log("--updateSurfaceVerticesWithMapping");
 		parallel_for((size_t)0, (size_t)surfaceVertices.size(), (size_t)1, [&](size_t surfVertex) {
 			if (surfaceToTetMeshVertexMap[surfVertex] != -1) {
 				surfaceVertices[surfVertex] = tetMeshVertices[surfaceToTetMeshVertexMap[surfVertex]];
@@ -359,11 +357,11 @@ namespace bcmapping {
 	void updateSurfaceVertices_s(
 		vector<vec3>& surfaceVertices,
 		const vector<vec3>& tetMeshVertices,
-		const vector<ivec4> &tetMeshTetrahedra,
+		const vector<ivec4>& tetMeshTetrahedra,
 		const vector<vec4>& barycentricCoords,
-		const vector<int>& barycentricTetIds) {
+		const vector<int>& barycentricTetIds
+		) {
 
-		//logger::log("--updateSurfaceVerticesWithMapping");
 		for (int surfVertex = 0; surfVertex < surfaceVertices.size(); surfVertex++) {
 			// get positions of related verts
 			ivec4 tetMeshTetrahedron = tetMeshTetrahedra[barycentricTetIds[surfVertex]];
