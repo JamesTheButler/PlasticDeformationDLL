@@ -327,17 +327,17 @@ void solve() {
 	}
 	_collisions.resize(0);
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
-	_solverExecutionTimes[1] = chrono::duration_cast<chrono::milliseconds>(duration).count();
+	_solverExecutionTimes[1] = chrono::duration_cast<chrono::microseconds>(duration).count();
 
 	auto constraintSolveStartTime = chrono::high_resolution_clock::now();
 	// solve constraints
 	for (int i = 0; i < _iterationCount; i++) {
 		solveConstraints();
 	}
-	_solverExecutionTimes[2] = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - constraintSolveStartTime).count();
+	_solverExecutionTimes[2] = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - constraintSolveStartTime).count();
 	// take solver time
 	duration = chrono::high_resolution_clock::now() - startTime;
-	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
+	_solverDeltaTime = chrono::duration_cast<chrono::microseconds>(duration).count();
 	_solverExecutionTimes[0] = _solverDeltaTime;
 	//logger::log("solver time: "+to_string(_solverDeltaTime));
 }
@@ -356,17 +356,17 @@ void solve_s() {
 	}
 	_collisions.resize(0);
 	chrono::duration<float> duration = chrono::high_resolution_clock::now() - startTime;
-	_solverExecutionTimes[1] = chrono::duration_cast<chrono::milliseconds>(duration).count();
+	_solverExecutionTimes[1] = chrono::duration_cast<chrono::microseconds>(duration).count();
 
 	auto constraintSolveStartTime = chrono::high_resolution_clock::now();
 	// solve constraints
 	for (int i = 0; i < _iterationCount; i++) {
 		solveConstraints();
 	}
-	_solverExecutionTimes[2] = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - constraintSolveStartTime).count();
+	_solverExecutionTimes[2] = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - constraintSolveStartTime).count();
 	// take solver time
 	duration = chrono::high_resolution_clock::now() - startTime;
-	_solverDeltaTime = chrono::duration_cast<chrono::milliseconds>(duration).count();
+	_solverDeltaTime = chrono::duration_cast<chrono::microseconds>(duration).count();
 	_solverExecutionTimes[0] = _solverDeltaTime;
 	//logger::log("solver time: "+to_string(_solverDeltaTime));
 }
@@ -747,7 +747,7 @@ extern "C" {
 			_barycentricCoordinates,
 			_barycentricTetIds
 		);
-		_solverExecutionTimes[3] = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count();
+		_solverExecutionTimes[3] = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime).count();
 
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);
@@ -769,7 +769,7 @@ extern "C" {
 			_barycentricTetIds
 		);
 		_debugFloat = _surfaceVertices.size();
-		_solverExecutionTimes[3] = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count();
+		_solverExecutionTimes[3] = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime).count();
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);
 		memcpy(output, result.data(), result.size() * sizeof(float));
@@ -789,7 +789,7 @@ extern "C" {
 			_barycentricCoordinates,
 			_barycentricTetIds
 		);
-		_solverExecutionTimes[3] = chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - startTime).count();
+		_solverExecutionTimes[3] = chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime).count();
 
 		vector<float> result;
 		vectorFuncs::getVectorData(newSurfVerts, result);
