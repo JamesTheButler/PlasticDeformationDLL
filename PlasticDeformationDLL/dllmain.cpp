@@ -64,6 +64,12 @@ string _storeFileName;
 float _solverDeltaTime = 0;
 
 int _collidingVertexCount = 0;
+vec3 _collisionCenter = vec3(0,0,0);
+
+bool _useFalloffDist = false;
+float _minFalloffDist = 100.0;
+float _maxFalloffDist = 100.0;
+
 int _iterationCount = 0;
 float _plasticityFactor = 0.0f;
 float _distance_stiffness = 1.0f;
@@ -71,6 +77,7 @@ float _volume_stiffness = 1.0f;
 
 int _debugInt = 0;
 float _debugFloat = 0.0f;
+vec3 _debugVec = vec3(0, 0, 0);
 
 void teardown() {
 	_tetMeshPosition = vec3();
@@ -97,6 +104,31 @@ void teardown() {
 }
 
 #pragma region solver
+
+
+/*float getDistanceFalloffFactor(vec3 vertex, vec3 collisionCenter, float minDistance, float maxDistance) {
+	float dist = distance(vertex, collisionCenter);
+	if (dist < minDistance)
+		return 1;
+	else if (dist > maxDistance)
+		return 0;
+	else
+		return 1 - misc::lerp(0, 1, (dist - minDistance) / (maxDistance - minDistance));
+}*/
+
+float getDistanceFalloffFactor(vec3 vertex) {
+	if (!_useFalloffDist)
+		return 1;
+	float dist = distance(vertex, _collisionCenter);
+	if (dist < _minFalloffDist)
+		return 1;
+	else if (dist > _maxFalloffDist)
+		return 0;
+	else
+		return 1 - misc::lerp(0, 1, (dist - _minFalloffDist) / (_maxFalloffDist - _minFalloffDist));
+}
+
+
 bool doesCollide(const vec3& vertex, const vec3& colliderPos, const vec3& colliderSize, const int colliderType) {
 	switch (colliderType) {
 	case -1: // default/unset
@@ -148,12 +180,22 @@ void projectVertices(const vec3& collPos, const vec3& collSize, const int collTy
 	parallel_for((size_t)0, (size_t)(_tetMeshVertices.size() - 1), (size_t)1, [=](size_t i) {
 		vec3 vertex = geometry::rotate(_tetMeshVertices.data()[i], _tetMeshRotation) + _tetMeshPosition;
 		if (doesCollide(vertex, collPos, collSize, collType)) {
+			_collisionCenter += vertex;
 			_collidingVertexCount++;
 			vertex = projectOrthogonal(vertex, collPos, collSize, collType);
 			// transform it into local space
 			_tetMeshVertices[i] = geometry::revertRotation(vertex - _tetMeshPosition, _tetMeshRotation);
 		}
 	});
+	if (!_useFalloffDist)
+		return;
+	if (_collidingVertexCount != 0) {
+	//	_collisionCenter = vec3(0, 0, 0);
+	//} else {
+		//_collisionCenter = geometry::revertRotation((_collisionCenter / (float)_collidingVertexCount) - _tetMeshPosition, _tetMeshRotation);
+		_debugVec = _collisionCenter;
+		_debugInt = _collidingVertexCount;
+	}
 }
 
 // projects vertices onto the surface of a collider
@@ -203,10 +245,10 @@ void solveVolumeConstraintsGaussSeidel() {
 			displacement = 0;
 		}
 		//update vertices
-		_tetMeshVertices[_volumeConstraints.vertexIds[i].x] += grad[0] * displacement;
-		_tetMeshVertices[_volumeConstraints.vertexIds[i].y] += grad[1] * displacement;
-		_tetMeshVertices[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement;
-		_tetMeshVertices[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].x] += grad[0] * displacement * getDistanceFalloffFactor(_tetMeshVertices[_volumeConstraints.vertexIds[i].x]);;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].y] += grad[1] * displacement * getDistanceFalloffFactor(_tetMeshVertices[_volumeConstraints.vertexIds[i].y]);;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].z] += grad[2] * displacement * getDistanceFalloffFactor(_tetMeshVertices[_volumeConstraints.vertexIds[i].z]);;
+		_tetMeshVertices[_volumeConstraints.vertexIds[i].w] += grad[3] * displacement * getDistanceFalloffFactor(_tetMeshVertices[_volumeConstraints.vertexIds[i].w]);;
 	}
 }
 
@@ -272,11 +314,11 @@ void solveDistanceConstraintsGaussSeidel() {
 		int id2 = _distanceConstraints.vertexIds[i].y;
 		float currentDistance = distance(_tetMeshVertices[id1], _tetMeshVertices[id2]);
 
-		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], distance(_tetMeshVertices[id1], _tetMeshVertices[id2]), _plasticityFactor);
+		_distanceConstraints.restValues[i] = misc::lerp(_distanceConstraints.restValues[i], currentDistance, _plasticityFactor);
 
 		vec3 delta = _distance_stiffness * normalize(_tetMeshVertices[id1] - _tetMeshVertices[id2]) * (_distanceConstraints.restValues[i] - currentDistance) / 2.0f;
-		_tetMeshVertices[id1] += delta;
-		_tetMeshVertices[id2] -= delta;
+		_tetMeshVertices[id1] += delta * getDistanceFalloffFactor(_tetMeshVertices[id1]);
+		_tetMeshVertices[id2] -= delta * getDistanceFalloffFactor(_tetMeshVertices[id2]);
 	}
 }
 
@@ -422,6 +464,13 @@ void setDistanceStiffness(float s) {
 void setPlasticity(float plasticity) {
 	_plasticityFactor = plasticity;
 	logger::log("--setPlasticity to " + to_string(plasticity));
+}
+
+void setFalloffDistance(float min, float max, int flag) {
+	_minFalloffDist = min;
+	_maxFalloffDist = max;
+	_useFalloffDist = flag==1?true:false;
+	logger::log("--setFalloffDistance to " + to_string(min) + " - " + to_string(max));
 }
 
 void setSurfaceVertices(float* surfaceVertices, int surfaceVertCount) {
@@ -679,6 +728,9 @@ extern "C" {
 	DLL_EXPORT void dll_setPlasticity(float plasticity) {
 		setPlasticity(plasticity);
 	}
+	DLL_EXPORT void dll_setFalloffDistance(float min, float max, int flag) {
+		setFalloffDistance(min, max, flag);
+	}
 	DLL_EXPORT void dll_setDistanceStiffness(float s) {
 		setDistanceStiffness(s);
 	}
@@ -907,6 +959,9 @@ extern "C" {
 	}
 #pragma endregion setup/setdown
 #pragma region tests
+	DLL_EXPORT void dll_getDebugVector(int* vecOutput) {
+		memcpy(vecOutput, vectorFuncs::getVectorData(_debugVec), 3 * sizeof(float));
+	}
 	DLL_EXPORT int dll_getDebugInt() {
 		return _debugInt;
 	}
